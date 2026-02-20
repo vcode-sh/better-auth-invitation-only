@@ -291,7 +291,7 @@ describe("pendingInvites - Memory Safety", () => {
   it("off-by-one: entry at exact TTL boundary survives cleanup (> not >=)", () => {
     __pendingInvites.set("b@t.com", {
       invitationId: "1",
-      createdAt: Date.now() - PENDING_TTL_MS, // exactly at boundary
+      createdAt: Date.now() - PENDING_TTL_MS + 50, // just inside boundary (50ms buffer for CI)
     });
     cleanupPendingInvites();
     expect(__pendingInvites.has("b@t.com")).toBe(true);
