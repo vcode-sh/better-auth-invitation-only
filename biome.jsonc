@@ -1,29 +1,43 @@
 {
-  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
-  "extends": ["ultracite"],
+  "$schema": "https://biomejs.dev/schemas/2.4.3/schema.json",
+  "extends": ["ultracite/core"],
   "linter": {
     "rules": {
       "complexity": {
-        "useNumericSeparators": "off",
         "noExcessiveCognitiveComplexity": "off"
       },
       "style": {
         "useNamingConvention": "off",
         "useFilenamingConvention": "off",
         "noNonNullAssertion": "off",
-        "useDefaultParameterLast": "off",
-        "noMagicNumbers": "off"
+        "useDefaultParameterLast": "off"
       },
       "suspicious": {
         "noExplicitAny": "off",
-        "noEmptyBlockStatements": "off"
-      },
-      "nursery": {
-        "useTopLevelRegex": "off"
+        "noEmptyBlockStatements": "off",
+        "noDocumentCookie": "off",
+        "useAwait": "off"
       },
       "performance": {
-        "noDelete": "off"
+        "noDelete": "off",
+        "noBarrelFile": "off",
+        "useTopLevelRegex": "off"
+      },
+      "correctness": {
+        "noUnusedFunctionParameters": "off"
       }
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["**/*.test.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "useBlockStatements": "off"
+          }
+        }
+      }
+    }
+  ]
 }

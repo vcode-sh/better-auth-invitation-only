@@ -1,6 +1,6 @@
 {
   "name": "better-auth-invitation-only",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Invite-only registration plugin for Better Auth. Gate signups with admin-managed invitation codes, support email + OAuth flows, with full CRUD admin endpoints.",
   "keywords": [
     "better-auth",

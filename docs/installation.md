@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - Node.js >= 22
-- Better Auth >= 1.0.0
+- Better Auth >= 1.4.18
 
 ## Install
 
@@ -27,7 +27,7 @@ export const auth = betterAuth({
   // ... your existing config
   plugins: [
     inviteOnly({
-      // All options are optional — defaults to enabled with 7-day expiry
+      // All options are optional -- defaults to enabled with 7-day expiry
       sendInviteEmail: async ({ email, inviteUrl }) => {
         // Your email sending logic here
       },

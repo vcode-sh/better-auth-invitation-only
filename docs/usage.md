@@ -15,6 +15,8 @@ const result = await authClient.signUp.email({
 
 The plugin's before-hook intercepts `/sign-up/email`, validates the code, and allows or blocks the signup.
 
+The invite code can also be passed as a query parameter (`?inviteCode=CODE`) for frameworks that prefer query params over body fields.
+
 ## OAuth Signup (Google, GitHub, etc.)
 
 OAuth redirects lose the invite code from the URL. Store it in a cookie first:
@@ -56,8 +58,8 @@ export function RegisterForm({ inviteCode }: { inviteCode?: string }) {
   const [inviteOnly, setInviteOnly] = useState(false);
 
   useEffect(() => {
-    authClient.inviteOnly.getInviteConfig().then((config) => {
-      setInviteOnly(config.enabled);
+    authClient.inviteOnly.getInviteConfig().then(({ data }) => {
+      if (data) setInviteOnly(data.enabled);
     });
   }, []);
 
@@ -88,7 +90,12 @@ export function RegisterForm({ inviteCode }: { inviteCode?: string }) {
   }
 
   return (
-    <form onSubmit={(e) => { e.preventDefault(); handleSubmit(new FormData(e.currentTarget)); }}>
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        handleSubmit(new FormData(e.currentTarget));
+      }}
+    >
       <input name="name" placeholder="Name" required />
       <input name="email" type="email" placeholder="Email" required />
       <input name="password" type="password" placeholder="Password" required />
@@ -104,40 +111,58 @@ export function RegisterForm({ inviteCode }: { inviteCode?: string }) {
 ## Admin Dashboard
 
 ```typescript
-// Create invitation
-const { code, inviteUrl, emailSent } = await authClient.inviteOnly.createInvitation({
+// Create single invitation
+const { data } = await authClient.inviteOnly.createInvitation({
   email: "newuser@example.com",
   sendEmail: true,
+  maxUses: 1,
+  metadata: { team: "engineering" },
 });
 
+// Create batch invitations
+const { data: batch } = await authClient.inviteOnly.createBatchInvitations({
+  invitations: [
+    { email: "alice@company.com", sendEmail: true },
+    { email: "bob@company.com", sendEmail: true, maxUses: 5 },
+    { email: "carol@company.com", metadata: { dept: "sales" } },
+  ],
+});
+console.log(`Created ${batch.count} invitations`);
+
 // List with pagination
-const { items, nextCursor } = await authClient.inviteOnly.listInvitations({
+const { data: page1 } = await authClient.inviteOnly.listInvitations({
   status: "pending",
   limit: 20,
 });
 
 // Load next page
-const page2 = await authClient.inviteOnly.listInvitations({
+const { data: page2 } = await authClient.inviteOnly.listInvitations({
   status: "pending",
   limit: 20,
-  cursor: nextCursor,
+  cursor: page1.nextCursor,
 });
 
-// Revoke
+// Revoke (soft delete)
 await authClient.inviteOnly.revokeInvitation({ id: invitation.id });
 
-// Resend email
+// Delete (hard delete, for GDPR)
+await authClient.inviteOnly.deleteInvitation({ id: invitation.id });
+
+// Resend email (revokes old, creates new code)
 await authClient.inviteOnly.resendInvitation({ id: invitation.id });
 
 // Stats
-const { total, pending, used, expired, revoked } = await authClient.inviteOnly.getInvitationStats();
+const { data: stats } = await authClient.inviteOnly.getInvitationStats();
+console.log(`${stats.pending} pending, ${stats.used} used`);
 ```
 
 ## Validate Code (Public)
 
 ```typescript
-const { valid, email, expiresAt } = await authClient.inviteOnly.validateInviteCode("abc123");
-if (valid) {
-  console.log(`Code is for ${email}, expires ${expiresAt}`);
+const { data } = await authClient.inviteOnly.validateInviteCode({ code: "abc123" });
+if (data.valid) {
+  console.log(`Code valid until ${data.expiresAt}`);
 }
 ```
+
+Note: The validate endpoint does not return email or any PII for security reasons.
