@@ -1,19 +1,26 @@
-import { createHash, randomBytes } from "node:crypto";
+export {
+  generateInviteCode,
+  hashInviteCode,
+  hashInviteCodeAsync,
+} from "./crypto";
+
 import type { Invitation, InvitationStatus } from "./types";
 
 /**
- * Generate a random hex invitation code.
- * @param lengthBytes Number of random bytes (output is 2x in hex chars).
+ * Safely parse a value into a Date object.
+ * Returns an invalid Date (NaN) for unrecognized inputs.
  */
-export function generateInviteCode(lengthBytes = 16): string {
-  return randomBytes(lengthBytes).toString("hex");
-}
-
-/**
- * Hash an invite code with SHA-256 for secure storage.
- */
-export function hashInviteCode(code: string): string {
-  return createHash("sha256").update(code).digest("hex");
+export function toDate(value: unknown): Date {
+  if (value instanceof Date) {
+    return value;
+  }
+  if (typeof value === "string") {
+    return new Date(value);
+  }
+  if (typeof value === "number") {
+    return new Date(value);
+  }
+  return new Date(Number.NaN);
 }
 
 /**
@@ -129,11 +136,15 @@ export function getEmailDomain(email: string): string {
   if (atIndex === -1) {
     return "";
   }
-  return email.slice(atIndex + 1).toLowerCase();
+  return email
+    .slice(atIndex + 1)
+    .toLowerCase()
+    .trim();
 }
 
 /**
  * Check if an email's domain is in the allowed domains list.
+ * Supports wildcard patterns: "*.example.com" matches "sub.example.com".
  */
 export function isDomainAllowed(
   email: string,
@@ -143,5 +154,12 @@ export function isDomainAllowed(
     return true;
   }
   const domain = getEmailDomain(email);
-  return allowedDomains.some((d) => d.toLowerCase() === domain);
+  return allowedDomains.some((d) => {
+    const pattern = d.toLowerCase().trim();
+    if (pattern.startsWith("*.")) {
+      const suffix = pattern.slice(2);
+      return domain === suffix || domain.endsWith(`.${suffix}`);
+    }
+    return pattern === domain;
+  });
 }

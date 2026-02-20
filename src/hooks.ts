@@ -1,6 +1,8 @@
 import { APIError, createAuthMiddleware } from "better-auth/api";
-import { ERROR_CODES, PENDING_MAX_SIZE, PENDING_TTL_MS } from "./constants";
-import type { Invitation, InviteOnlyPluginOptions } from "./types";
+import { createAfterHooks as createAfterHooksImpl } from "./after-hooks";
+import { ERROR_CODES } from "./constants";
+import { MemoryInviteStore } from "./invite-store";
+import type { Invitation, InviteOnlyPluginOptions, InviteStore } from "./types";
 import {
   hashInviteCode,
   isDomainAllowed,
@@ -8,34 +10,19 @@ import {
   parseInviteCodeFromCookie,
 } from "./utils";
 
-interface PendingEntry {
-  createdAt: number;
-  invitationId: string;
-}
+/** @deprecated Use `inviteStore` option instead. Kept for test compat. */
+const defaultStore = new MemoryInviteStore();
 
-const pendingInvites = new Map<string, PendingEntry>();
+export { defaultStore as __pendingInvites };
 
-export { pendingInvites as __pendingInvites };
-
+/** @deprecated Use MemoryInviteStore.cleanup() directly. */
 export function cleanupPendingInvites(): void {
-  const now = Date.now();
-  for (const [key, entry] of pendingInvites) {
-    if (now - entry.createdAt > PENDING_TTL_MS) {
-      pendingInvites.delete(key);
-    }
-  }
+  defaultStore.cleanup();
 }
 
-let cleanupInterval: ReturnType<typeof setInterval> | null = null;
-
+/** @deprecated Use MemoryInviteStore.startCleanupInterval() directly. */
 export function startCleanupInterval(): void {
-  if (cleanupInterval) {
-    return;
-  }
-  cleanupInterval = setInterval(cleanupPendingInvites, 60_000);
-  if (typeof cleanupInterval === "object" && "unref" in cleanupInterval) {
-    cleanupInterval.unref();
-  }
+  defaultStore.startCleanupInterval();
 }
 
 async function findInvitationByCodeHash(
@@ -57,17 +44,6 @@ async function resolveEnabled(
   return enabled ?? true;
 }
 
-function ensureMapCapacity(): void {
-  if (pendingInvites.size >= PENDING_MAX_SIZE) {
-    cleanupPendingInvites();
-    if (pendingInvites.size >= PENDING_MAX_SIZE) {
-      throw new APIError("TOO_MANY_REQUESTS", {
-        message: "Too many pending signups. Please try again later.",
-      });
-    }
-  }
-}
-
 export function createBeforeHooks(options: {
   enabled: InviteOnlyPluginOptions["enabled"];
   emailSignupPath: string;
@@ -75,7 +51,9 @@ export function createBeforeHooks(options: {
   oauthPrefix: string;
   cookieName: string;
   allowedDomains?: string[];
+  store?: InviteStore;
 }) {
+  const store = options.store ?? defaultStore;
   const hooks: any[] = [];
 
   // Email signup gate
@@ -109,7 +87,6 @@ export function createBeforeHooks(options: {
         });
       }
 
-      // Email binding: if invitation targets a specific email, enforce match
       const signupEmail = (body.email as string)?.toLowerCase().trim();
       if (
         signupEmail &&
@@ -121,7 +98,6 @@ export function createBeforeHooks(options: {
         });
       }
 
-      // Domain whitelist check
       if (
         signupEmail &&
         !isDomainAllowed(signupEmail, options.allowedDomains)
@@ -131,10 +107,12 @@ export function createBeforeHooks(options: {
         });
       }
 
-      ensureMapCapacity();
+      if (store instanceof MemoryInviteStore) {
+        store.ensureCapacity();
+      }
 
       if (signupEmail) {
-        pendingInvites.set(signupEmail, {
+        await store.set(signupEmail, {
           invitationId: invitation.id,
           createdAt: Date.now(),
         });
@@ -174,10 +152,11 @@ export function createBeforeHooks(options: {
           });
         }
 
-        ensureMapCapacity();
+        if (store instanceof MemoryInviteStore) {
+          store.ensureCapacity();
+        }
 
-        // Use specific code as key to avoid cross-user collisions
-        pendingInvites.set(`__code:${inviteCode}`, {
+        await store.set(`__code:${inviteCode}`, {
           invitationId: invitation.id,
           createdAt: Date.now(),
         });
@@ -193,105 +172,8 @@ export function createAfterHooks(options: {
   oauthPrefix: string;
   cookieName: string;
   onInvitationUsed?: InviteOnlyPluginOptions["onInvitationUsed"];
+  store?: InviteStore;
 }) {
-  return [
-    {
-      matcher: (context: any) =>
-        context.path === options.emailSignupPath ||
-        context.path?.startsWith(options.oauthPrefix),
-      handler: createAuthMiddleware(async (ctx) => {
-        const user =
-          (ctx.context as any).newUser ?? (ctx.context as any).returned?.user;
-        if (!user?.id) {
-          return;
-        }
-
-        const email = user.email?.toLowerCase();
-        let invitationId: string | undefined;
-
-        // Try email-keyed entry first (email signup)
-        if (email) {
-          const entry = pendingInvites.get(email);
-          if (entry) {
-            invitationId = entry.invitationId;
-            pendingInvites.delete(email);
-          }
-        }
-
-        // For OAuth, match specific code from cookie
-        if (!invitationId) {
-          const cookieHeader = ctx.headers?.get?.("cookie") ?? "";
-          const inviteCode = parseInviteCodeFromCookie(
-            cookieHeader,
-            options.cookieName
-          );
-          if (inviteCode) {
-            const key = `__code:${inviteCode}`;
-            const entry = pendingInvites.get(key);
-            if (entry) {
-              invitationId = entry.invitationId;
-              pendingInvites.delete(key);
-            }
-          }
-        }
-
-        if (!invitationId) {
-          return;
-        }
-
-        try {
-          // Load the full invitation for multi-use logic
-          const invitation = (await ctx.context.adapter.findOne({
-            model: "invitation",
-            where: [{ field: "id", value: invitationId }],
-          })) as Invitation | null;
-
-          if (!invitation) {
-            return;
-          }
-
-          const isMultiUse = (invitation.maxUses ?? 1) > 1;
-          const newUseCount = (invitation.useCount ?? 0) + 1;
-
-          if (isMultiUse) {
-            // Multi-use: increment useCount, set usedAt/usedBy only at limit
-            const update: Record<string, any> = { useCount: newUseCount };
-            if (newUseCount >= invitation.maxUses) {
-              update.usedAt = new Date();
-              update.usedBy = user.id;
-            }
-            await ctx.context.adapter.update({
-              model: "invitation",
-              where: [{ field: "id", value: invitationId }],
-              update,
-            });
-          } else {
-            // Single-use: mark as consumed immediately
-            await ctx.context.adapter.update({
-              model: "invitation",
-              where: [{ field: "id", value: invitationId }],
-              update: { usedBy: user.id, usedAt: new Date(), useCount: 1 },
-            });
-          }
-
-          // Fire onInvitationUsed callback
-          if (options.onInvitationUsed) {
-            try {
-              await options.onInvitationUsed({ invitation, user });
-            } catch (err) {
-              ctx.context.logger?.error?.("onInvitationUsed callback failed", {
-                error: err,
-              });
-            }
-          }
-        } catch (err) {
-          ctx.context.logger?.error?.("Failed to consume invitation", {
-            invitationId,
-            userId: user.id,
-            error: err,
-          });
-        }
-      }),
-    },
-  ];
+  const store = options.store ?? defaultStore;
+  return createAfterHooksImpl(store, options);
 }

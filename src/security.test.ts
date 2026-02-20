@@ -177,6 +177,18 @@ describe("parseInviteCodeFromCookie - Security", () => {
       )
     ).toBe("first");
   });
+
+  it("handles cookie value containing = characters", () => {
+    expect(parseInviteCodeFromCookie("ba-invite-code=abc=def=ghi", NAME)).toBe(
+      "abc=def=ghi"
+    );
+  });
+
+  it("handles cookie value containing encoded ; characters", () => {
+    expect(parseInviteCodeFromCookie("ba-invite-code=abc%3Bdef", NAME)).toBe(
+      "abc;def"
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -217,6 +229,8 @@ describe("Input Fuzzing", () => {
       revokedAt: null,
       usedAt: null,
       expiresAt: new Date("invalid"),
+      maxUses: 1,
+      useCount: 0,
     };
     expect(computeInvitationStatus(inv)).toBe("expired");
     expect(isInvitationValid(inv)).toBe(false);
@@ -228,6 +242,8 @@ describe("Input Fuzzing", () => {
       usedAt: null,
       revokedAt: null,
       expiresAt: now,
+      maxUses: 1,
+      useCount: 0,
     });
     expect(typeof valid).toBe("boolean");
   });
@@ -239,6 +255,8 @@ describe("Input Fuzzing", () => {
         revokedAt: new Date(),
         usedAt: new Date(),
         expiresAt: past,
+        maxUses: 1,
+        useCount: 0,
       })
     ).toBe("revoked");
     expect(
@@ -246,6 +264,8 @@ describe("Input Fuzzing", () => {
         revokedAt: null,
         usedAt: new Date(),
         expiresAt: past,
+        maxUses: 1,
+        useCount: 0,
       })
     ).toBe("used");
   });
@@ -255,32 +275,33 @@ describe("Input Fuzzing", () => {
 // 6. MEMORY SAFETY -- pendingInvites Map
 // ---------------------------------------------------------------------------
 describe("pendingInvites - Memory Safety", () => {
-  beforeEach(() => __pendingInvites.clear());
+  const map = () => __pendingInvites.__map;
+  beforeEach(() => map().clear());
 
   it("cleanup removes entries older than TTL but keeps fresh ones", () => {
-    __pendingInvites.set("old@t.com", {
+    map().set("old@t.com", {
       invitationId: "1",
       createdAt: Date.now() - PENDING_TTL_MS - 1000,
     });
-    __pendingInvites.set("new@t.com", {
+    map().set("new@t.com", {
       invitationId: "2",
       createdAt: Date.now(),
     });
     cleanupPendingInvites();
-    expect(__pendingInvites.has("old@t.com")).toBe(false);
-    expect(__pendingInvites.has("new@t.com")).toBe(true);
+    expect(map().has("old@t.com")).toBe(false);
+    expect(map().has("new@t.com")).toBe(true);
   });
 
   it("BUG: map grows past PENDING_MAX_SIZE when all entries are fresh", () => {
     for (let i = 0; i < PENDING_MAX_SIZE; i++) {
-      __pendingInvites.set(`u${i}@t.com`, {
+      map().set(`u${i}@t.com`, {
         invitationId: `${i}`,
         createdAt: Date.now(),
       });
     }
     // Cleanup removes nothing because all are fresh
     cleanupPendingInvites();
-    __pendingInvites.set("overflow@t.com", {
+    map().set("overflow@t.com", {
       invitationId: "x",
       createdAt: Date.now(),
     });
@@ -289,24 +310,24 @@ describe("pendingInvites - Memory Safety", () => {
   });
 
   it("off-by-one: entry at exact TTL boundary survives cleanup (> not >=)", () => {
-    __pendingInvites.set("b@t.com", {
+    map().set("b@t.com", {
       invitationId: "1",
       createdAt: Date.now() - PENDING_TTL_MS + 50, // just inside boundary (50ms buffer for CI)
     });
     cleanupPendingInvites();
-    expect(__pendingInvites.has("b@t.com")).toBe(true);
+    expect(map().has("b@t.com")).toBe(true);
   });
 
   it("concurrent same-email signups: second silently overwrites first", () => {
-    __pendingInvites.set("a@t.com", {
+    map().set("a@t.com", {
       invitationId: "first",
       createdAt: Date.now(),
     });
-    __pendingInvites.set("a@t.com", {
+    map().set("a@t.com", {
       invitationId: "second",
       createdAt: Date.now(),
     });
-    expect(__pendingInvites.get("a@t.com")?.invitationId).toBe("second");
+    expect(map().get("a@t.com")?.invitationId).toBe("second");
     expect(__pendingInvites.size).toBe(1);
   });
 });

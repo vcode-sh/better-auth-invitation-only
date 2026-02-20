@@ -1,6 +1,7 @@
 import type { BetterAuthPlugin } from "better-auth";
 import { createAdminEndpoints } from "./admin-endpoints";
 import { createAdminMutations } from "./admin-mutations";
+import { createAdminQueries } from "./admin-queries";
 import {
   DEFAULT_CODE_LENGTH_BYTES,
   DEFAULT_COOKIE_NAME,
@@ -8,22 +9,22 @@ import {
   DEFAULT_REGISTER_PATH,
   ERROR_CODES,
 } from "./constants";
-import {
-  createAfterHooks,
-  createBeforeHooks,
-  startCleanupInterval,
-} from "./hooks";
+import { createAfterHooks, createBeforeHooks } from "./hooks";
+import { MemoryInviteStore } from "./invite-store";
 import { createPublicEndpoints } from "./public-endpoints";
 import type { InviteOnlyPluginOptions } from "./types";
 
 export { ERROR_CODES } from "./constants";
 export { __pendingInvites } from "./hooks";
+export { MemoryInviteStore } from "./invite-store";
 export type {
   CreateInvitationResult,
   Invitation,
   InvitationStats,
   InvitationWithStatus,
   InviteOnlyPluginOptions,
+  InviteStore,
+  InviteStoreEntry,
   ResendInvitationResult,
 } from "./types";
 export {
@@ -31,8 +32,10 @@ export {
   computeInvitationStatus,
   generateInviteCode,
   hashInviteCode,
+  hashInviteCodeAsync,
   isInvitationValid,
   maskEmail,
+  toDate,
 } from "./utils";
 
 export const inviteOnly = (options: InviteOnlyPluginOptions = {}) => {
@@ -50,7 +53,10 @@ export const inviteOnly = (options: InviteOnlyPluginOptions = {}) => {
     onInvitationUsed,
     allowedDomains,
     rateLimits,
+    inviteStore: customStore,
   } = options;
+
+  const store = customStore ?? new MemoryInviteStore();
 
   const emailSignupPath = protectedPaths.emailSignup ?? "/sign-up/email";
   const interceptOauth = protectedPaths.oauthCallbacks ?? true;
@@ -69,13 +75,24 @@ export const inviteOnly = (options: InviteOnlyPluginOptions = {}) => {
 
   const adminEndpoints = createAdminEndpoints(endpointOpts);
   const adminMutations = createAdminMutations(endpointOpts);
+  const adminQueries = createAdminQueries(endpointOpts);
   const publicEndpoints = createPublicEndpoints({ enabled });
 
   return {
     id: "invite-only",
 
-    init: async () => {
-      startCleanupInterval();
+    init: async (ctx: any) => {
+      if (store instanceof MemoryInviteStore) {
+        store.startCleanupInterval();
+        if (
+          typeof process !== "undefined" &&
+          process.env?.NODE_ENV === "production"
+        ) {
+          ctx?.context?.logger?.warn?.(
+            "invite-only: Using in-memory invite store. Not suitable for multi-process or serverless deployments. Provide a custom inviteStore option."
+          );
+        }
+      }
     },
 
     schema: {
@@ -125,17 +142,20 @@ export const inviteOnly = (options: InviteOnlyPluginOptions = {}) => {
         oauthPrefix,
         cookieName,
         allowedDomains,
+        store,
       }),
       after: createAfterHooks({
         emailSignupPath,
         oauthPrefix,
         cookieName,
         onInvitationUsed,
+        store,
       }),
     },
 
     endpoints: {
       ...adminEndpoints,
+      ...adminQueries,
       ...adminMutations,
       ...publicEndpoints,
     },

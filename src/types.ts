@@ -48,6 +48,13 @@ export interface InviteOnlyPluginOptions {
   generateCode?: () => string | Promise<string>;
 
   /**
+   * Custom store for pending invite entries. Default: in-memory Map.
+   * Provide a custom implementation for multi-process/serverless deployments
+   * (e.g., Redis, Cloudflare KV, database-backed).
+   */
+  inviteStore?: InviteStore;
+
+  /**
    * Callback to determine if the current user can manage invitations.
    * By default, checks for `role === "admin"` on the session user.
    * Provide a custom function for different authorization logic.
@@ -183,4 +190,25 @@ export interface ResendInvitationResult {
  */
 export interface InvitationWithStatus extends Invitation {
   status: InvitationStatus;
+}
+
+/**
+ * Entry stored in the invite store between signup validation and consumption.
+ */
+export interface InviteStoreEntry {
+  createdAt: number;
+  invitationId: string;
+}
+
+/**
+ * Pluggable storage for pending invite entries.
+ * Default: in-memory Map (MemoryInviteStore).
+ * Provide a custom implementation for multi-process/serverless deployments
+ * (e.g., Redis, Cloudflare KV, database-backed).
+ */
+export interface InviteStore {
+  cleanup(): Promise<void> | void;
+  delete(key: string): Promise<void> | void;
+  get(key: string): Promise<InviteStoreEntry | null> | InviteStoreEntry | null;
+  set(key: string, value: InviteStoreEntry): Promise<void> | void;
 }

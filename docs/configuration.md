@@ -66,6 +66,11 @@ inviteOnly({
     }
   },
 
+  // Custom invite store for multi-process/serverless deployments.
+  // Default: in-memory Map (single-process only).
+  // See "Custom Invite Store" section below.
+  inviteStore: new RedisInviteStore(redis),
+
   // Override default rate limits per endpoint.
   rateLimits: {
     validate: { max: 10, window: 60 },  // Default
@@ -94,6 +99,14 @@ For when "invite-only" still isn't exclusive enough. Restrict which email domain
 ```typescript
 inviteOnly({
   allowedDomains: ["company.com", "partner.org"],
+})
+```
+
+Wildcard patterns are supported -- `*.example.com` matches `sub.example.com` and `deep.sub.example.com`:
+
+```typescript
+inviteOnly({
+  allowedDomains: ["company.com", "*.partner.org"],
 })
 ```
 
@@ -148,3 +161,54 @@ inviteOnly({
 ```
 
 The callback is wrapped in a try-catch -- if it throws, the error is logged but the signup is not rolled back. The user still gets in. Your Slack notification about the failed webhook is a problem for future-you.
+
+## Custom Invite Store
+
+By default, pending invite entries are stored in an in-memory Map. This works perfectly for single-process Node.js deployments. For multi-process, cluster, or serverless deployments, provide a custom store implementation.
+
+The `InviteStore` interface:
+
+```typescript
+import type { InviteStore, InviteStoreEntry } from "better-auth-invitation-only";
+
+interface InviteStore {
+  get(key: string): Promise<InviteStoreEntry | null> | InviteStoreEntry | null;
+  set(key: string, value: InviteStoreEntry): Promise<void> | void;
+  delete(key: string): Promise<void> | void;
+  cleanup(): Promise<void> | void;
+}
+```
+
+Example Redis implementation:
+
+```typescript
+import type { InviteStore, InviteStoreEntry } from "better-auth-invitation-only";
+
+class RedisInviteStore implements InviteStore {
+  constructor(private redis: Redis, private ttlMs = 5 * 60 * 1000) {}
+
+  async get(key: string) {
+    const raw = await this.redis.get(`invite:${key}`);
+    return raw ? JSON.parse(raw) : null;
+  }
+
+  async set(key: string, value: InviteStoreEntry) {
+    await this.redis.set(`invite:${key}`, JSON.stringify(value), "PX", this.ttlMs);
+  }
+
+  async delete(key: string) {
+    await this.redis.del(`invite:${key}`);
+  }
+
+  async cleanup() {
+    // Redis TTL handles expiration automatically
+  }
+}
+
+// Use it:
+inviteOnly({
+  inviteStore: new RedisInviteStore(redis),
+})
+```
+
+All methods can be synchronous or return a Promise -- the plugin awaits either way.

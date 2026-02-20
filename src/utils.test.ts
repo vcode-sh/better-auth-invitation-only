@@ -7,6 +7,7 @@ import {
   isDomainAllowed,
   isInvitationValid,
   parseInviteCodeFromCookie,
+  toDate,
 } from "./utils";
 
 describe("generateInviteCode", () => {
@@ -253,6 +254,51 @@ describe("isDomainAllowed", () => {
     expect(isDomainAllowed("user@EXAMPLE.COM", ["example.com"])).toBe(true);
     expect(isDomainAllowed("user@example.com", ["EXAMPLE.COM"])).toBe(true);
   });
+
+  it("supports wildcard *.domain patterns", () => {
+    expect(isDomainAllowed("user@sub.example.com", ["*.example.com"])).toBe(
+      true
+    );
+    expect(
+      isDomainAllowed("user@deep.sub.example.com", ["*.example.com"])
+    ).toBe(true);
+    expect(isDomainAllowed("user@example.com", ["*.example.com"])).toBe(true);
+    expect(isDomainAllowed("user@other.com", ["*.example.com"])).toBe(false);
+  });
+
+  it("handles wildcard with case insensitivity", () => {
+    expect(isDomainAllowed("user@SUB.EXAMPLE.COM", ["*.example.com"])).toBe(
+      true
+    );
+    expect(isDomainAllowed("user@sub.example.com", ["*.EXAMPLE.COM"])).toBe(
+      true
+    );
+  });
+
+  it("handles mixed exact and wildcard patterns", () => {
+    const domains = ["exact.com", "*.wild.org"];
+    expect(isDomainAllowed("user@exact.com", domains)).toBe(true);
+    expect(isDomainAllowed("user@sub.wild.org", domains)).toBe(true);
+    expect(isDomainAllowed("user@wild.org", domains)).toBe(true);
+    expect(isDomainAllowed("user@other.com", domains)).toBe(false);
+  });
+
+  it("trims whitespace from domain patterns", () => {
+    expect(isDomainAllowed("user@example.com", [" example.com "])).toBe(true);
+    expect(isDomainAllowed("user@sub.example.com", [" *.example.com "])).toBe(
+      true
+    );
+  });
+
+  it("handles email with trailing whitespace in domain", () => {
+    expect(isDomainAllowed("user@example.com ", ["example.com"])).toBe(true);
+  });
+
+  it("handles email with multiple @ signs", () => {
+    expect(isDomainAllowed("user@middle@example.com", ["example.com"])).toBe(
+      true
+    );
+  });
 });
 
 describe("getEmailDomain", () => {
@@ -262,6 +308,25 @@ describe("getEmailDomain", () => {
 
   it("handles email without @ sign", () => {
     expect(getEmailDomain("noemail")).toBe("");
+  });
+
+  it("trims trailing whitespace from domain", () => {
+    expect(getEmailDomain("user@example.com ")).toBe("example.com");
+    expect(getEmailDomain("user@example.com\t")).toBe("example.com");
+    expect(getEmailDomain("user@example.com \n")).toBe("example.com");
+  });
+
+  it("handles multiple @ signs (uses lastIndexOf)", () => {
+    expect(getEmailDomain("user@middle@real.com")).toBe("real.com");
+    expect(getEmailDomain("a@b@c@d.com")).toBe("d.com");
+  });
+
+  it("lowercases domain", () => {
+    expect(getEmailDomain("user@EXAMPLE.COM")).toBe("example.com");
+  });
+
+  it("handles empty domain after @", () => {
+    expect(getEmailDomain("user@")).toBe("");
   });
 });
 
@@ -368,5 +433,54 @@ describe("buildInviteUrl", () => {
     expect(buildInviteUrl("https://app.com", "/auth/signup", "code")).toBe(
       "https://app.com/auth/signup?invite=code"
     );
+  });
+});
+
+describe("toDate", () => {
+  it("returns the same Date object when given a Date", () => {
+    const d = new Date("2024-01-15T12:00:00Z");
+    expect(toDate(d)).toBe(d);
+  });
+
+  it("parses ISO date strings", () => {
+    const result = toDate("2024-01-15T12:00:00Z");
+    expect(result).toBeInstanceOf(Date);
+    expect(result.toISOString()).toBe("2024-01-15T12:00:00.000Z");
+  });
+
+  it("parses numeric timestamps", () => {
+    const ts = 1_705_320_000_000;
+    const result = toDate(ts);
+    expect(result).toBeInstanceOf(Date);
+    expect(result.getTime()).toBe(ts);
+  });
+
+  it("returns invalid Date for null", () => {
+    const result = toDate(null);
+    expect(result).toBeInstanceOf(Date);
+    expect(Number.isNaN(result.getTime())).toBe(true);
+  });
+
+  it("returns invalid Date for undefined", () => {
+    const result = toDate(undefined);
+    expect(result).toBeInstanceOf(Date);
+    expect(Number.isNaN(result.getTime())).toBe(true);
+  });
+
+  it("returns invalid Date for non-date objects", () => {
+    const result = toDate({ foo: "bar" });
+    expect(result).toBeInstanceOf(Date);
+    expect(Number.isNaN(result.getTime())).toBe(true);
+  });
+
+  it("returns invalid Date for invalid date string", () => {
+    const result = toDate("not-a-date");
+    expect(result).toBeInstanceOf(Date);
+    expect(Number.isNaN(result.getTime())).toBe(true);
+  });
+
+  it("handles zero timestamp", () => {
+    const result = toDate(0);
+    expect(result.getTime()).toBe(0);
   });
 });

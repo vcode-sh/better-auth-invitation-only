@@ -2,6 +2,43 @@
 
 All notable changes to this project will be documented here. I keep it honest -- no "minor improvements" hand-waving.
 
+## [0.3.0] - 2026-02-20
+
+The "runs everywhere, trusts nothing" release. Took every low-confidence gap -- edge runtimes, MongoDB, community adapters, OAuth in serverless -- and beat them into submission with 88 new tests and zero assumptions about your stack.
+
+### Added
+
+- **Web Crypto API fallback** -- SHA-256 hashing and code generation now work on Cloudflare Workers, Vercel Edge, and Deno. Node `crypto` used when available, `crypto.subtle` when it isn't. Your invite codes don't care where they run.
+- **Pluggable `InviteStore` interface** -- swap the in-memory pending invites Map for Redis, KV, Durable Objects, whatever. `get`, `set`, `delete`, `cleanup`. That's the whole contract.
+- **`MemoryInviteStore`** -- default implementation, same behaviour as before, now behind a proper interface
+- **`safeCount()` adapter helper** -- graceful fallback when adapters don't implement `count()`. Falls back to `findMany` + `.length` with a one-time performance warning. Handles adapters returning `{ count: N }` objects too.
+- **Wildcard domain whitelist** -- `*.example.com` now matches `foo.example.com`. Because someone was going to ask.
+- **`toDate()` utility** -- defensive Date parsing that handles Date objects, ISO strings, and timestamps. Adapters return whatever they feel like; this normalizes it.
+- **`hasNodeCrypto()` runtime detection** -- feature-checks `node:crypto` before importing it
+- **Production warning** -- logs a warning at init if you're using the default in-memory store. Because you will deploy to serverless and forget.
+- **MongoDB integration tests** -- 12 tests via `mongodb-memory-server`. Full adapter coverage: findOne, findMany, count, update, create, delete, cursor pagination, metadata JSON, date round-trips.
+- **SQLite integration tests** -- 21 tests using `getTestInstance()` from better-auth. Full plugin lifecycle, real signup flow, endpoint testing, pagination, metadata round-trips.
+- **Crypto unit tests** -- 15 tests covering Web Crypto paths, Node crypto paths, and fallback behaviour
+- **Adapter helper tests** -- 11 tests for `safeCount` with every adapter quirk imaginable
+- **Bun CI job** -- full test suite verified on Bun 1.3.9, added to GitHub Actions matrix
+- **Compatibility docs** -- README now has framework, database, runtime, and deployment compatibility tables
+- **Known Limitations docs** -- honest about what doesn't work (cursor pagination ties, Safari ITP, single-process in-memory store)
+- **InviteStore docs** -- `configuration.md` now has the interface spec and a Redis example
+
+### Changed
+
+- Extracted `admin-queries.ts` from `admin-endpoints.ts` (was 417 LOC, now 265 + 150). Files have a 250 LOC limit and I enforce it.
+- Extracted `crypto.ts` for all hashing/random generation with runtime detection
+- Extracted `invite-store.ts` for the pluggable store interface and default implementation
+- Extracted `after-hooks.ts` for post-signup hook logic
+- `setInterval` cleanup now handles missing `unref()` gracefully (edge runtimes don't have it)
+- Email domain extraction trims whitespace and handles multiple `@` signs correctly
+- README updated with compatibility section, known limitations, and deployment guidance
+
+### Fixed
+
+- Email domain comparison now trims before matching (trailing whitespace no longer bypasses domain whitelist)
+
 ## [0.2.1] - 2026-02-20
 
 The "make it look like a proper open source project" patch. No code changes -- just the stuff that makes contributors feel welcome and GitHub look professional.

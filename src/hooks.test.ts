@@ -7,6 +7,7 @@ import {
   createBeforeHooks,
   startCleanupInterval,
 } from "./hooks";
+import type { InviteStore, InviteStoreEntry } from "./types";
 import { hashInviteCode } from "./utils";
 
 const future = () => new Date(Date.now() + 86_400_000);
@@ -77,37 +78,40 @@ const aCtx = (adapter: any, user: any, cookie?: string) => {
   };
 };
 
+/** Helper to access the internal map of the default MemoryInviteStore. */
+const map = () => __pendingInvites.__map;
+
 describe("hooks.ts", () => {
   beforeEach(() => {
-    __pendingInvites.clear();
+    map().clear();
     vi.restoreAllMocks();
   });
 
   // --- cleanupPendingInvites ---
   describe("cleanup", () => {
     it("removes expired, keeps fresh", () => {
-      __pendingInvites.set("old", {
+      map().set("old", {
         invitationId: "x",
         createdAt: Date.now() - PENDING_TTL_MS - 1,
       });
-      __pendingInvites.set("new", { invitationId: "y", createdAt: Date.now() });
+      map().set("new", { invitationId: "y", createdAt: Date.now() });
       cleanupPendingInvites();
-      expect(__pendingInvites.has("old")).toBe(false);
-      expect(__pendingInvites.has("new")).toBe(true);
+      expect(map().has("old")).toBe(false);
+      expect(map().has("new")).toBe(true);
     });
 
     it("removes ALL expired entries (not just first)", () => {
       for (let i = 0; i < 50; i++)
-        __pendingInvites.set(`e${i}`, {
+        map().set(`e${i}`, {
           invitationId: `i${i}`,
           createdAt: Date.now() - PENDING_TTL_MS - 1,
         });
-      __pendingInvites.set("keep", {
+      map().set("keep", {
         invitationId: "k",
         createdAt: Date.now(),
       });
       cleanupPendingInvites();
-      expect(__pendingInvites.size).toBe(1);
+      expect(map().size).toBe(1);
     });
 
     it("no-ops on empty map", () => {
@@ -115,13 +119,12 @@ describe("hooks.ts", () => {
     });
 
     it("entry at exactly TTL boundary is NOT removed (off-by-one)", () => {
-      // createdAt exactly PENDING_TTL_MS ago: now - createdAt === PENDING_TTL_MS, NOT > PENDING_TTL_MS
-      __pendingInvites.set("boundary", {
+      map().set("boundary", {
         invitationId: "b",
         createdAt: Date.now() - PENDING_TTL_MS,
       });
       cleanupPendingInvites();
-      expect(__pendingInvites.has("boundary")).toBe(true);
+      expect(map().has("boundary")).toBe(true);
     });
   });
 
@@ -190,7 +193,7 @@ describe("hooks.ts", () => {
       await createBeforeHooks(OPTS)[0].handler(
         eCtx(a, { email: "ALICE@Example.COM", inviteCode: "valid-code" })
       );
-      expect(__pendingInvites.has("alice@example.com")).toBe(true);
+      expect(map().has("alice@example.com")).toBe(true);
     });
 
     it("SEC-6: EMAIL_MISMATCH when signup email != invitation email", async () => {
@@ -240,7 +243,7 @@ describe("hooks.ts", () => {
 
     it("SEC-2: cleanup triggered at PENDING_MAX_SIZE", async () => {
       for (let i = 0; i < PENDING_MAX_SIZE; i++)
-        __pendingInvites.set(`f${i}`, {
+        map().set(`f${i}`, {
           invitationId: `i${i}`,
           createdAt: Date.now() - PENDING_TTL_MS - 1,
         });
@@ -249,13 +252,12 @@ describe("hooks.ts", () => {
       await createBeforeHooks(OPTS)[0].handler(
         eCtx(a, { email: "alice@example.com", inviteCode: "valid-code" })
       );
-      expect(__pendingInvites.size).toBe(1);
+      expect(map().size).toBe(1);
     });
 
     it("SEC-2 FIX: map at PENDING_MAX_SIZE with all fresh entries rejects with TOO_MANY_REQUESTS", async () => {
-      // Fill with FRESH entries — cleanup won't remove any
       for (let i = 0; i < PENDING_MAX_SIZE; i++)
-        __pendingInvites.set(`f${i}`, {
+        map().set(`f${i}`, {
           invitationId: `i${i}`,
           createdAt: Date.now(),
         });
@@ -266,7 +268,7 @@ describe("hooks.ts", () => {
           eCtx(a, { email: "alice@example.com", inviteCode: "valid-code" })
         )
       ).rejects.toThrow("Too many pending signups");
-      expect(__pendingInvites.size).toBe(PENDING_MAX_SIZE);
+      expect(map().size).toBe(PENDING_MAX_SIZE);
     });
 
     it("no pending entry when body has no email", async () => {
@@ -275,7 +277,7 @@ describe("hooks.ts", () => {
       await createBeforeHooks(OPTS)[0].handler(
         eCtx(a, { inviteCode: "valid-code" })
       );
-      expect(__pendingInvites.size).toBe(0);
+      expect(map().size).toBe(0);
     });
 
     it("handles null body gracefully", async () => {
@@ -291,8 +293,7 @@ describe("hooks.ts", () => {
       await createBeforeHooks(OPTS)[0].handler(
         eCtx(a, { email: "   ", inviteCode: "valid-code" })
       );
-      // " ".toLowerCase().trim() === "" which is falsy
-      expect(__pendingInvites.size).toBe(0);
+      expect(map().size).toBe(0);
     });
 
     it("same user signing up twice overwrites pending entry", async () => {
@@ -307,10 +308,7 @@ describe("hooks.ts", () => {
       await h[0].handler(
         eCtx(a, { email: "alice@example.com", inviteCode: "valid-code" })
       );
-      // Second call overwrites — maps have set semantics
-      expect(__pendingInvites.get("alice@example.com")?.invitationId).toBe(
-        "inv-B"
-      );
+      expect(map().get("alice@example.com")?.invitationId).toBe("inv-B");
     });
   });
 
@@ -327,8 +325,8 @@ describe("hooks.ts", () => {
       const a = mkAdapter();
       a.findOne.mockResolvedValue(inv());
       await createBeforeHooks(OPTS)[1].handler(oCtx(a, "valid-code"));
-      expect(__pendingInvites.has("__code:valid-code")).toBe(true);
-      expect(__pendingInvites.has("alice@example.com")).toBe(false);
+      expect(map().has("__code:valid-code")).toBe(true);
+      expect(map().has("alice@example.com")).toBe(false);
     });
 
     it("SEC-1: concurrent OAuth with different codes = separate entries", async () => {
@@ -339,8 +337,8 @@ describe("hooks.ts", () => {
       const h = createBeforeHooks(OPTS);
       await h[1].handler(oCtx(a, "code-A"));
       await h[1].handler(oCtx(a, "code-B"));
-      expect(__pendingInvites.get("__code:code-A")?.invitationId).toBe("A");
-      expect(__pendingInvites.get("__code:code-B")?.invitationId).toBe("B");
+      expect(map().get("__code:code-A")?.invitationId).toBe("A");
+      expect(map().get("__code:code-B")?.invitationId).toBe("B");
     });
 
     it("no OAuth hook when interceptOauth=false", () => {
@@ -350,7 +348,6 @@ describe("hooks.ts", () => {
     });
 
     it("OAuth does NOT enforce email binding (design gap)", async () => {
-      // Invitation bound to alice@, but OAuth has no email to check — passes
       const a = mkAdapter();
       a.findOne.mockResolvedValue(inv({ email: "alice@specific.com" }));
       await expect(
@@ -397,7 +394,7 @@ describe("hooks.ts", () => {
 
     it("TOO_MANY_REQUESTS when OAuth pending map is full with fresh entries", async () => {
       for (let i = 0; i < PENDING_MAX_SIZE; i++)
-        __pendingInvites.set(`f${i}`, {
+        map().set(`f${i}`, {
           invitationId: `i${i}`,
           createdAt: Date.now(),
         });
@@ -410,14 +407,14 @@ describe("hooks.ts", () => {
 
     it("OAuth cleanup frees space when map is full of expired entries", async () => {
       for (let i = 0; i < PENDING_MAX_SIZE; i++)
-        __pendingInvites.set(`f${i}`, {
+        map().set(`f${i}`, {
           invitationId: `i${i}`,
           createdAt: Date.now() - PENDING_TTL_MS - 1,
         });
       const a = mkAdapter();
       a.findOne.mockResolvedValue(inv());
       await createBeforeHooks(OPTS)[1].handler(oCtx(a, "valid-code"));
-      expect(__pendingInvites.has("__code:valid-code")).toBe(true);
+      expect(map().has("__code:valid-code")).toBe(true);
     });
   });
 
@@ -456,7 +453,7 @@ describe("hooks.ts", () => {
       const a = mkAdapter();
       a.findOne.mockResolvedValue(inv());
       a.update.mockResolvedValue({});
-      __pendingInvites.set("alice@example.com", {
+      map().set("alice@example.com", {
         invitationId: "inv-1",
         createdAt: Date.now(),
       });
@@ -469,14 +466,14 @@ describe("hooks.ts", () => {
           where: [{ field: "id", value: "inv-1" }],
         })
       );
-      expect(__pendingInvites.has("alice@example.com")).toBe(false);
+      expect(map().has("alice@example.com")).toBe(false);
     });
 
     it("consumes by __code: key for OAuth", async () => {
       const a = mkAdapter();
       a.findOne.mockResolvedValue(inv());
       a.update.mockResolvedValue({});
-      __pendingInvites.set("__code:oc", {
+      map().set("__code:oc", {
         invitationId: "inv-o",
         createdAt: Date.now(),
       });
@@ -484,18 +481,18 @@ describe("hooks.ts", () => {
       ctx.path = "/callback/google";
       await createAfterHooks(OPTS)[0].handler(ctx);
       expect(a.update).toHaveBeenCalled();
-      expect(__pendingInvites.has("__code:oc")).toBe(false);
+      expect(map().has("__code:oc")).toBe(false);
     });
 
     it("prefers email key over __code: key", async () => {
       const a = mkAdapter();
       a.findOne.mockResolvedValue(inv());
       a.update.mockResolvedValue({});
-      __pendingInvites.set("alice@example.com", {
+      map().set("alice@example.com", {
         invitationId: "by-email",
         createdAt: Date.now(),
       });
-      __pendingInvites.set("__code:c", {
+      map().set("__code:c", {
         invitationId: "by-code",
         createdAt: Date.now(),
       });
@@ -507,7 +504,7 @@ describe("hooks.ts", () => {
           where: [{ field: "id", value: "by-email" }],
         })
       );
-      expect(__pendingInvites.has("__code:c")).toBe(true); // not consumed
+      expect(map().has("__code:c")).toBe(true); // not consumed
     });
 
     it("no-op when user.id is falsy", async () => {
@@ -528,7 +525,7 @@ describe("hooks.ts", () => {
       const a = mkAdapter();
       a.findOne.mockResolvedValue(inv());
       a.update.mockRejectedValue(new Error("boom"));
-      __pendingInvites.set("a@b.com", {
+      map().set("a@b.com", {
         invitationId: "inv-1",
         createdAt: Date.now(),
       });
@@ -543,7 +540,7 @@ describe("hooks.ts", () => {
       const a = mkAdapter();
       a.findOne.mockResolvedValue(inv());
       a.update.mockResolvedValue({});
-      __pendingInvites.set("bob@t.com", {
+      map().set("bob@t.com", {
         invitationId: "inv-r",
         createdAt: Date.now(),
       });
@@ -587,7 +584,7 @@ describe("hooks.ts", () => {
       const a = mkAdapter();
       a.findOne.mockResolvedValue(inv());
       a.update.mockRejectedValue(new Error("fail"));
-      __pendingInvites.set("a@b.com", {
+      map().set("a@b.com", {
         invitationId: "inv-1",
         createdAt: Date.now(),
       });
@@ -597,7 +594,6 @@ describe("hooks.ts", () => {
         headers: new Headers(),
         context: { adapter: a, newUser: { id: "u1", email: "a@b.com" } },
       };
-      // logger is undefined, optional chaining should prevent crash
       await expect(
         createAfterHooks(OPTS)[0].handler(ctx)
       ).resolves.not.toThrow();
@@ -610,7 +606,7 @@ describe("hooks.ts", () => {
       const a = mkAdapter();
       a.findOne.mockResolvedValue(inv({ maxUses: 5, useCount: 2 }));
       a.update.mockResolvedValue({});
-      __pendingInvites.set("alice@example.com", {
+      map().set("alice@example.com", {
         invitationId: "inv-1",
         createdAt: Date.now(),
       });
@@ -627,7 +623,7 @@ describe("hooks.ts", () => {
       const a = mkAdapter();
       a.findOne.mockResolvedValue(inv({ maxUses: 3, useCount: 2 }));
       a.update.mockResolvedValue({});
-      __pendingInvites.set("alice@example.com", {
+      map().set("alice@example.com", {
         invitationId: "inv-1",
         createdAt: Date.now(),
       });
@@ -644,7 +640,7 @@ describe("hooks.ts", () => {
       const a = mkAdapter();
       a.findOne.mockResolvedValue(inv({ maxUses: 1, useCount: 0 }));
       a.update.mockResolvedValue({});
-      __pendingInvites.set("alice@example.com", {
+      map().set("alice@example.com", {
         invitationId: "inv-1",
         createdAt: Date.now(),
       });
@@ -666,7 +662,7 @@ describe("hooks.ts", () => {
       const invitation = inv();
       a.findOne.mockResolvedValue(invitation);
       a.update.mockResolvedValue({});
-      __pendingInvites.set("alice@example.com", {
+      map().set("alice@example.com", {
         invitationId: "inv-1",
         createdAt: Date.now(),
       });
@@ -684,7 +680,7 @@ describe("hooks.ts", () => {
       const a = mkAdapter();
       a.findOne.mockResolvedValue(inv());
       a.update.mockResolvedValue({});
-      __pendingInvites.set("alice@example.com", {
+      map().set("alice@example.com", {
         invitationId: "inv-1",
         createdAt: Date.now(),
       });
@@ -698,7 +694,6 @@ describe("hooks.ts", () => {
     it("callback not called when no invitation consumed", async () => {
       const onUsed = vi.fn();
       const a = mkAdapter();
-      // No pending entry, so nothing to consume
       await createAfterHooks({ ...OPTS, onInvitationUsed: onUsed })[0].handler(
         aCtx(a, { id: "u1", email: "nobody@example.com" })
       );
@@ -769,7 +764,10 @@ describe("hooks.ts", () => {
     it("enabled toggling mid-flight via async function", async () => {
       let n = 0;
       const a = mkAdapter();
-      const h = createBeforeHooks({ ...OPTS, enabled: async () => ++n <= 1 });
+      const h = createBeforeHooks({
+        ...OPTS,
+        enabled: async () => ++n <= 1,
+      });
       await expect(h[0].handler(eCtx(a, { email: "a@b.com" }))).rejects.toThrow(
         ERROR_CODES.INVITE_REQUIRED
       );
@@ -799,6 +797,136 @@ describe("hooks.ts", () => {
           eCtx(a, { email: "a@b.com", inviteCode: "x" })
         )
       ).rejects.toThrow("DB timeout");
+    });
+  });
+
+  // --- Custom InviteStore ---
+  describe("custom InviteStore", () => {
+    function createMockStore(): InviteStore & {
+      _data: Map<string, InviteStoreEntry>;
+    } {
+      const data = new Map<string, InviteStoreEntry>();
+      return {
+        _data: data,
+        get: vi.fn((key: string) => data.get(key) ?? null),
+        set: vi.fn((key: string, value: InviteStoreEntry) => {
+          data.set(key, value);
+        }),
+        delete: vi.fn((key: string) => {
+          data.delete(key);
+        }),
+        cleanup: vi.fn(),
+      };
+    }
+
+    it("before hook uses custom store for email signup", async () => {
+      const store = createMockStore();
+      const a = mkAdapter();
+      a.findOne.mockResolvedValue(inv());
+      await createBeforeHooks({ ...OPTS, store })[0].handler(
+        eCtx(a, { email: "alice@example.com", inviteCode: "valid-code" })
+      );
+      expect(store.set).toHaveBeenCalledWith(
+        "alice@example.com",
+        expect.objectContaining({ invitationId: "inv-1" })
+      );
+      expect(store._data.has("alice@example.com")).toBe(true);
+      // Default store should NOT have the entry
+      expect(map().has("alice@example.com")).toBe(false);
+    });
+
+    it("before hook uses custom store for OAuth", async () => {
+      const store = createMockStore();
+      const a = mkAdapter();
+      a.findOne.mockResolvedValue(inv());
+      await createBeforeHooks({ ...OPTS, store })[1].handler(
+        oCtx(a, "valid-code")
+      );
+      expect(store.set).toHaveBeenCalledWith(
+        "__code:valid-code",
+        expect.objectContaining({ invitationId: "inv-1" })
+      );
+    });
+
+    it("after hook uses custom store to consume by email", async () => {
+      const store = createMockStore();
+      const a = mkAdapter();
+      a.findOne.mockResolvedValue(inv());
+      a.update.mockResolvedValue({});
+      store._data.set("alice@example.com", {
+        invitationId: "inv-1",
+        createdAt: Date.now(),
+      });
+      await createAfterHooks({ ...OPTS, store })[0].handler(
+        aCtx(a, { id: "u1", email: "Alice@Example.com" })
+      );
+      expect(store.get).toHaveBeenCalledWith("alice@example.com");
+      expect(store.delete).toHaveBeenCalledWith("alice@example.com");
+      expect(a.update).toHaveBeenCalled();
+    });
+
+    it("after hook uses custom store to consume by __code: key", async () => {
+      const store = createMockStore();
+      const a = mkAdapter();
+      a.findOne.mockResolvedValue(inv());
+      a.update.mockResolvedValue({});
+      store._data.set("__code:oc", {
+        invitationId: "inv-o",
+        createdAt: Date.now(),
+      });
+      const ctx = aCtx(a, { id: "u2", email: "bob@test.com" }, "oc");
+      ctx.path = "/callback/google";
+      await createAfterHooks({ ...OPTS, store })[0].handler(ctx);
+      expect(store.get).toHaveBeenCalledWith("__code:oc");
+      expect(store.delete).toHaveBeenCalledWith("__code:oc");
+    });
+
+    it("custom store with async methods works correctly", async () => {
+      const data = new Map<string, InviteStoreEntry>();
+      const asyncStore: InviteStore = {
+        get: async (key) => data.get(key) ?? null,
+        set: async (key, value) => {
+          data.set(key, value);
+        },
+        delete: async (key) => {
+          data.delete(key);
+        },
+        cleanup: async () => {},
+      };
+      const a = mkAdapter();
+      a.findOne.mockResolvedValue(inv());
+      a.update.mockResolvedValue({});
+
+      // Before hook stores entry
+      await createBeforeHooks({ ...OPTS, store: asyncStore })[0].handler(
+        eCtx(a, { email: "alice@example.com", inviteCode: "valid-code" })
+      );
+      expect(data.has("alice@example.com")).toBe(true);
+
+      // After hook consumes entry
+      await createAfterHooks({ ...OPTS, store: asyncStore })[0].handler(
+        aCtx(a, { id: "u1", email: "Alice@Example.com" })
+      );
+      expect(data.has("alice@example.com")).toBe(false);
+      expect(a.update).toHaveBeenCalled();
+    });
+
+    it("custom store does not trigger ensureCapacity", async () => {
+      const store = createMockStore();
+      // Fill default store to capacity — should not affect custom store
+      for (let i = 0; i < PENDING_MAX_SIZE; i++)
+        map().set(`f${i}`, {
+          invitationId: `i${i}`,
+          createdAt: Date.now(),
+        });
+      const a = mkAdapter();
+      a.findOne.mockResolvedValue(inv());
+      // Custom store should NOT throw TOO_MANY_REQUESTS
+      await expect(
+        createBeforeHooks({ ...OPTS, store })[0].handler(
+          eCtx(a, { email: "alice@example.com", inviteCode: "valid-code" })
+        )
+      ).resolves.not.toThrow();
     });
   });
 });

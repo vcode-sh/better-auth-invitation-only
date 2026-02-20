@@ -11,7 +11,7 @@ Not another "it just works" feature list written by someone who's never shipped 
 - **Multi-use codes** -- create shareable invite links with configurable max uses (1-10,000)
 - **Batch invitations** -- create up to 50 invitations in a single API call
 - **Admin CRUD endpoints** -- create, list, revoke, resend, and delete invitations via API
-- **Domain whitelist** -- restrict signups to specific email domains
+- **Domain whitelist** -- restrict signups to specific email domains (supports `*.example.com` wildcards)
 - **Custom metadata** -- attach arbitrary data to invitations (team, role, department)
 - **Lifecycle callback** -- `onInvitationUsed` fires after signup for post-registration logic
 - **Runtime toggle** -- enable/disable invite-only mode without rebuilding
@@ -25,6 +25,8 @@ Not another "it just works" feature list written by someone who's never shipped 
 - **Hard delete** -- permanently remove invitation records (GDPR compliance)
 - **Email callback** -- pluggable email sending (bring your own Resend/Postmark/SES/etc.)
 - **Rate limiting** -- built-in per-endpoint rate limits (configurable)
+- **Pluggable invite store** -- swap the default in-memory store for Redis, KV, or any custom backend
+- **Web Crypto fallback** -- works in edge runtimes where `node:crypto` isn't available
 - **Full type safety** -- typed client plugin with `$InferServerPlugin`
 
 ## Installation
@@ -59,8 +61,10 @@ export const auth = betterAuth({
           body: `Join here: ${inviteUrl}`,
         });
       },
-      // Optional: restrict to specific domains
-      allowedDomains: ["company.com", "partner.org"],
+      // Optional: restrict to specific domains (wildcards supported)
+      allowedDomains: ["company.com", "*.partner.org"],
+      // Optional: custom store for multi-process/serverless
+      // inviteStore: new RedisInviteStore(redis),
       // Optional: post-signup callback
       onInvitationUsed: async ({ invitation, user }) => {
         await assignRole(user.id, invitation.metadata?.role);
@@ -170,6 +174,46 @@ The plugin creates an `invitation` table. Yes, it touches your database. No, it 
 
 Run Better Auth's migration CLI or manage the table manually with your ORM.
 
+## Compatibility
+
+Works with any framework and database that Better Auth supports. We tested it so you don't have to -- although you probably should anyway, because trust issues are healthy in software engineering.
+
+### Frameworks
+
+The plugin registers endpoints and hooks through Better Auth's plugin API. It's framework-agnostic -- if Better Auth works with your framework, this plugin works too. Tested patterns include Next.js (App Router), Astro, Hono, Express, and TanStack Start.
+
+### Databases
+
+Tested against real adapters:
+
+| Database | Status | Notes |
+|----------|--------|-------|
+| SQLite (better-sqlite3) | Tested | Full integration test suite |
+| MongoDB | Tested | Full integration test suite via mongodb-memory-server |
+| PostgreSQL | Supported | Uses standard adapter operations |
+| MySQL | Supported | Uses standard adapter operations |
+
+The plugin uses only standard adapter methods (`findOne`, `findMany`, `create`, `update`, `delete`, `count`). Community adapters (Convex, SurrealDB, PocketBase, etc.) should work if they implement these methods. If an adapter doesn't support `count()`, the plugin falls back to `findMany` + length with a performance warning.
+
+### Runtimes
+
+| Runtime | Status | Notes |
+|---------|--------|-------|
+| Node.js >= 22 | Tested | Primary runtime |
+| Bun | Tested | Full test suite passes |
+| Cloudflare Workers / Edge | Partial | Code hashing works (Web Crypto fallback). Requires custom `inviteStore` -- the default in-memory store is stateless per invocation. |
+
+### Deployment Modes
+
+| Mode | Default Store | Custom Store Needed? |
+|------|---------------|---------------------|
+| Single-process Node.js | In-memory Map | No |
+| PM2 cluster / multi-process | -- | Yes (Redis, database, etc.) |
+| Serverless (Vercel, AWS Lambda) | -- | Yes |
+| Edge (Cloudflare Workers) | -- | Yes (KV, D1, etc.) |
+
+For multi-process or serverless, provide a custom `inviteStore`. See [configuration.md](docs/configuration.md#custom-invite-store).
+
 ## Security
 
 I take security seriously, which is a sentence that usually precedes a data breach announcement. In this case, though, I actually mean it.
@@ -182,6 +226,15 @@ I take security seriously, which is a sentence that usually precedes a data brea
 - OAuth cookies use `Secure`, `SameSite=Lax`, and short TTL
 - All inputs validated with Zod with length limits (max 256 chars)
 - Per-endpoint rate limiting prevents brute-force attacks
+
+## Known Limitations
+
+Every project has them. Most just don't admit it.
+
+- **In-memory store is single-process only** -- the default `MemoryInviteStore` uses a process-local Map. In cluster mode or serverless, pending invite entries won't be shared between instances. Provide a custom `inviteStore` for distributed deployments.
+- **OAuth invite flow requires cookie support** -- the invite code is passed through a `SameSite=Lax` cookie. Safari ITP may block cookies in cross-domain OAuth redirects. Some frameworks (Next.js, SvelteKit, TanStack Start) need their cookie plugin configured for server-side cookie access.
+- **`adapter.count()` with `ne` operator** -- some adapter implementations handle `{ operator: "ne", value: null }` inconsistently. The stats endpoint uses `safeCount()` which falls back to `findMany` + length if `count()` fails.
+- **Cursor pagination tie-breaking** -- if two invitations share an identical `createdAt` timestamp (within DB precision), cursor pagination may skip one. This is rare in practice.
 
 ## License
 
