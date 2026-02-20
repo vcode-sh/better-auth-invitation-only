@@ -2,7 +2,6 @@
 
 [![npm version](https://img.shields.io/npm/v/better-auth-invitation-only)](https://www.npmjs.com/package/better-auth-invitation-only)
 [![CI](https://github.com/vcode-sh/better-auth-invitation-only/actions/workflows/ci.yml/badge.svg)](https://github.com/vcode-sh/better-auth-invitation-only/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/github/vcode-sh/better-auth-invitation-only/graph/badge.svg?token=SJ1VN77SER)](https://codecov.io/github/vcode-sh/better-auth-invitation-only)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9+-3178c6)](https://www.typescriptlang.org/)
 
