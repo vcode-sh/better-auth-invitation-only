@@ -1,6 +1,6 @@
 # Configuration
 
-All options are optional. The plugin works with sensible defaults.
+All options are optional. The defaults are genuinely sensible, not the "I called them sensible so you'd stop asking" kind.
 
 ```typescript
 inviteOnly({
@@ -77,7 +77,7 @@ inviteOnly({
 
 ## Runtime Toggle
 
-The `enabled` option can be a function:
+The `enabled` option accepts a function, so you can flip invite-only mode on and off without redeploying. The kind of feature that sounds trivial until you're the one explaining to your CEO why the public launch is blocked by a deploy queue.
 
 ```typescript
 inviteOnly({
@@ -89,7 +89,7 @@ This is evaluated on every request, so changing the env var and restarting the s
 
 ## Domain Whitelist
 
-Restrict which email domains can use invitation codes:
+For when "invite-only" still isn't exclusive enough. Restrict which email domains can use invitation codes:
 
 ```typescript
 inviteOnly({
@@ -101,7 +101,7 @@ When set, the domain check applies to both invitation creation (admin) and signu
 
 ## Multi-Use Codes
 
-Create shareable invite links that can be used multiple times:
+Create shareable invite links that can be used multiple times. Perfect for "share this with your team" without generating 47 individual invitations like some kind of medieval scribe.
 
 ```typescript
 // Server: create a multi-use invitation
@@ -115,7 +115,7 @@ The invitation tracks `useCount` and is fully consumed (`usedAt` set) when `useC
 
 ## Custom Metadata
 
-Attach arbitrary data to invitations for post-signup logic:
+Attach arbitrary data to invitations for post-signup logic. Shove whatever you want in there -- team assignments, roles, a heartfelt welcome message. Vibe Code stores it as JSON and minds its own business.
 
 ```typescript
 const { data } = await authClient.inviteOnly.createInvitation({
@@ -134,7 +134,7 @@ inviteOnly({
 
 ## Post-Signup Callback
 
-The `onInvitationUsed` callback fires after a successful signup that consumed an invitation:
+The `onInvitationUsed` callback fires after a successful signup that consumed an invitation. This is where you do the interesting stuff -- role assignment, team onboarding, welcome emails, whatever your product manager dreamed up this sprint.
 
 ```typescript
 inviteOnly({
@@ -147,4 +147,4 @@ inviteOnly({
 })
 ```
 
-The callback is wrapped in a try-catch -- if it throws, the error is logged but the signup is not rolled back.
+The callback is wrapped in a try-catch -- if it throws, the error is logged but the signup is not rolled back. The user still gets in. Your Slack notification about the failed webhook is a problem for future-you.

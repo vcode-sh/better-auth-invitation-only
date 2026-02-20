@@ -1,8 +1,10 @@
 # Usage
 
+The part where you actually wire things up. Concepts are great but shipped code pays rent.
+
 ## Email/Password Signup
 
-Pass `inviteCode` as an extra field in the signup body:
+Pass `inviteCode` as an extra field in the signup body. The plugin's before-hook intercepts `/sign-up/email`, validates the code, and either lets them through or tells them to jog on.
 
 ```typescript
 const result = await authClient.signUp.email({
@@ -13,13 +15,11 @@ const result = await authClient.signUp.email({
 });
 ```
 
-The plugin's before-hook intercepts `/sign-up/email`, validates the code, and allows or blocks the signup.
-
-The invite code can also be passed as a query parameter (`?inviteCode=CODE`) for frameworks that prefer query params over body fields.
+The invite code can also be passed as a query parameter (`?inviteCode=CODE`) for frameworks that prefer query params over body fields. I don't pick sides in that war.
 
 ## OAuth Signup (Google, GitHub, etc.)
 
-OAuth redirects lose the invite code from the URL. Store it in a cookie first:
+OAuth redirects have the charming habit of losing everything you put in the URL. Store the invite code in a cookie first, like a digital post-it note for your future self:
 
 ```typescript
 // 1. Set cookie before redirect
@@ -32,9 +32,11 @@ await authClient.signIn.social({
 });
 ```
 
-The plugin reads the cookie from the OAuth callback request and validates it.
+The plugin reads the cookie from the OAuth callback request and validates it. The cookie self-destructs after 5 minutes because nothing good happens to stale auth tokens.
 
 ## Registration Page (Next.js Example)
+
+A full registration page that checks if invite-only mode is active and handles both email and OAuth flows. Copy-paste with confidence -- or at least with reasonable certainty.
 
 ```tsx
 // app/register/page.tsx (Server Component)
@@ -110,6 +112,8 @@ export function RegisterForm({ inviteCode }: { inviteCode?: string }) {
 
 ## Admin Dashboard
 
+Where the power trips happen. Create, list, revoke, delete, resend -- the full lifecycle of making people feel special about getting access to your app.
+
 ```typescript
 // Create single invitation
 const { data } = await authClient.inviteOnly.createInvitation({
@@ -158,6 +162,8 @@ console.log(`${stats.pending} pending, ${stats.used} used`);
 
 ## Validate Code (Public)
 
+Let users check if their code still works before they fill out the whole form. A small mercy in a cruel world.
+
 ```typescript
 const { data } = await authClient.inviteOnly.validateInviteCode({ code: "abc123" });
 if (data.valid) {
@@ -165,4 +171,4 @@ if (data.valid) {
 }
 ```
 
-Note: The validate endpoint does not return email or any PII for security reasons.
+Note: The validate endpoint does not return email or any PII for security reasons. I thought about it for exactly zero seconds before deciding that was obviously the right call.

@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main, develop]
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -20,6 +24,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
+          cache: npm
 
       - name: Install dependencies
         run: npm ci
@@ -27,18 +32,17 @@ jobs:
       - name: Type check
         run: npm run type-check
 
-      - name: Run tests
-        run: npm test
-
       - name: Run tests with coverage
         run: npm run test:coverage
 
       - name: Upload coverage
         if: matrix.node-version == '22.x'
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           file: ./coverage/lcov.info
           fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   build:
     runs-on: ubuntu-latest
@@ -51,6 +55,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22.x
+          cache: npm
 
       - name: Install dependencies
         run: npm ci
@@ -60,12 +65,15 @@ jobs:
 
       - name: Verify dist artifacts
         run: |
-          test -f dist/index.js || exit 1
-          test -f dist/index.mjs || exit 1
-          test -f dist/index.d.ts || exit 1
-          test -f dist/client.js || exit 1
-          test -f dist/client.mjs || exit 1
-          test -f dist/client.d.ts || exit 1
+          echo "## Build Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "| File | Size |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|------|" >> $GITHUB_STEP_SUMMARY
+          for f in dist/index.js dist/index.cjs dist/index.d.ts dist/index.d.cts \
+                   dist/client.js dist/client.cjs dist/client.d.ts dist/client.d.cts; do
+            test -f "$f" || { echo "::error::Missing artifact: $f"; exit 1; }
+            SIZE=$(wc -c < "$f" | tr -d ' ')
+            echo "| $f | ${SIZE}B |" >> $GITHUB_STEP_SUMMARY
+          done
 
   lint:
     runs-on: ubuntu-latest
@@ -77,12 +85,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22.x
+          cache: npm
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Type check
-        run: npm run type-check
 
       - name: Lint
         run: npm run lint

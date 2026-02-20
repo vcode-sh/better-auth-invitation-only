@@ -1,31 +1,35 @@
 # better-auth-invitation-only
 
-Invite-only registration plugin for [Better Auth](https://better-auth.com). Gate your signups with admin-managed invitation codes.
+Your app is not a nightclub, but it should have a bouncer. Invite-only registration plugin for [Better Auth](https://better-auth.com) -- because "open signups" is just another way of saying "please, bots, come ruin everything."
 
 ## Features
 
-- **Invite-gated registration** — block all signups unless a valid invite code is provided
-- **Email + OAuth support** — works with email/password signup and social OAuth (Google, GitHub, etc.)
-- **Multi-use codes** — create shareable invite links with configurable max uses (1-10,000)
-- **Batch invitations** — create up to 50 invitations in a single API call
-- **Admin CRUD endpoints** — create, list, revoke, resend, and delete invitations via API
-- **Domain whitelist** — restrict signups to specific email domains
-- **Custom metadata** — attach arbitrary data to invitations (team, role, department)
-- **Lifecycle callback** — `onInvitationUsed` fires after signup for post-registration logic
-- **Runtime toggle** — enable/disable invite-only mode without rebuilding
-- **Configurable rate limits** — override default rate limits per endpoint
-- **Cursor-paginated listing** — efficiently browse invitations with status filtering
-- **Stats endpoint** — aggregate counts (pending, used, expired, revoked)
-- **Code validation endpoint** — public endpoint to check code validity before signup
-- **SHA-256 code hashing** — invite codes are never stored in plaintext
-- **Auto-consumption** — invitation is automatically marked as used after successful signup
-- **Soft revocation** — revoke invitations while preserving audit trail
-- **Hard delete** — permanently remove invitation records (GDPR compliance)
-- **Email callback** — pluggable email sending (bring your own Resend/Postmark/SES/etc.)
-- **Rate limiting** — built-in per-endpoint rate limits (configurable)
-- **Full type safety** — typed client plugin with `$InferServerPlugin`
+Not another "it just works" feature list written by someone who's never shipped anything. This one actually does what it says.
+
+- **Invite-gated registration** -- block all signups unless a valid invite code is provided
+- **Email + OAuth support** -- works with email/password signup and social OAuth (Google, GitHub, etc.)
+- **Multi-use codes** -- create shareable invite links with configurable max uses (1-10,000)
+- **Batch invitations** -- create up to 50 invitations in a single API call
+- **Admin CRUD endpoints** -- create, list, revoke, resend, and delete invitations via API
+- **Domain whitelist** -- restrict signups to specific email domains
+- **Custom metadata** -- attach arbitrary data to invitations (team, role, department)
+- **Lifecycle callback** -- `onInvitationUsed` fires after signup for post-registration logic
+- **Runtime toggle** -- enable/disable invite-only mode without rebuilding
+- **Configurable rate limits** -- override default rate limits per endpoint
+- **Cursor-paginated listing** -- efficiently browse invitations with status filtering
+- **Stats endpoint** -- aggregate counts (pending, used, expired, revoked)
+- **Code validation endpoint** -- public endpoint to check code validity before signup
+- **SHA-256 code hashing** -- invite codes are never stored in plaintext
+- **Auto-consumption** -- invitation is automatically marked as used after successful signup
+- **Soft revocation** -- revoke invitations while preserving audit trail
+- **Hard delete** -- permanently remove invitation records (GDPR compliance)
+- **Email callback** -- pluggable email sending (bring your own Resend/Postmark/SES/etc.)
+- **Rate limiting** -- built-in per-endpoint rate limits (configurable)
+- **Full type safety** -- typed client plugin with `$InferServerPlugin`
 
 ## Installation
+
+One command. No 47-step Medium article required.
 
 ```bash
 npm install better-auth-invitation-only
@@ -34,6 +38,8 @@ npm install better-auth-invitation-only
 ## Quick Start
 
 ### Server
+
+Drop this into your auth config and suddenly you have standards.
 
 ```typescript
 import { betterAuth } from "better-auth";
@@ -50,7 +56,7 @@ export const auth = betterAuth({
         await sendEmail({
           to: email,
           subject: "You're invited!",
-          body: `Join us: ${inviteUrl}`,
+          body: `Join here: ${inviteUrl}`,
         });
       },
       // Optional: restrict to specific domains
@@ -65,6 +71,8 @@ export const auth = betterAuth({
 ```
 
 ### Client
+
+The client side. Where hopes and dreams meet `async/await`.
 
 ```typescript
 import { createAuthClient } from "better-auth/client";
@@ -132,6 +140,8 @@ See [docs/api-reference.md](docs/api-reference.md) for all endpoints.
 
 ## How It Works
 
+Six steps. Fewer than your morning standup, and considerably more useful.
+
 1. Admin creates an invitation via `/invite-only/create` -- generates a unique code, stores SHA-256 hash
 2. User receives invite link: `/register?invite=CODE`
 3. On signup, the plugin's before-hook validates the code against the database
@@ -141,7 +151,7 @@ See [docs/api-reference.md](docs/api-reference.md) for all endpoints.
 
 ## Database Schema
 
-The plugin creates an `invitation` table:
+The plugin creates an `invitation` table. Yes, it touches your database. No, it won't text your ex.
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -161,6 +171,8 @@ The plugin creates an `invitation` table:
 Run Better Auth's migration CLI or manage the table manually with your ORM.
 
 ## Security
+
+I take security seriously, which is a sentence that usually precedes a data breach announcement. In this case, though, I actually mean it.
 
 - Invite codes are hashed with SHA-256 before storage -- raw codes are never persisted
 - Email binding enforces that the signup email matches the invitation target

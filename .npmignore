@@ -21,4 +21,11 @@ info/
 pull-*.md
 voice-tone.md
 CONTRIBUTING.md
+CODE_OF_CONDUCT.md
+SECURITY.md
 PLAN.md
+TODO.md
+todo1.md
+better-auth-*.md
+.nvmrc
+.vitest/

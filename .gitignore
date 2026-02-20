@@ -1,19 +1,38 @@
+# Dependencies
 node_modules
+
+# Build output
 dist
-.DS_Store
-.env
-info/
-.mcp.json
-.claude
-.npmrc
-.messages/
+*.tgz
+
+# Coverage
 coverage/
 .vitest/
+
+# Environment
+.env
+.env.*
+.npmrc
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Claude / AI
+.claude
+.mcp.json
+.messages/
+
+# Project notes (not shipped)
+info/
 voice-tone.md
 TODO.md
-*.tgz
 PLAN.md
+todo1.md
 better-auth-plugins.md
 better-auth-typescript.md
 better-auth-problems.md
-todo1.md

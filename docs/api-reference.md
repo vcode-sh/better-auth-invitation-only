@@ -1,8 +1,8 @@
 # API Reference
 
-## Endpoints
-
 All endpoints are prefixed with your Better Auth base path (default: `/api/auth`).
+
+## Endpoints
 
 ### POST `/invite-only/create`
 
@@ -38,6 +38,8 @@ Create a new invitation. **Requires admin session.**
   "metadata": { "team": "engineering", "role": "member" }
 }
 ```
+
+The plaintext `code` is returned exactly once. It is hashed before storage and cannot be retrieved again.
 
 ### POST `/invite-only/create-batch`
 
@@ -105,7 +107,9 @@ Revoke an invitation (soft-delete). **Requires admin session.**
 
 ### POST `/invite-only/resend`
 
-Resend the invitation email. **Requires admin session.** Revokes the old invitation and creates a new one with a fresh code. Fails if `sendInviteEmail` is not configured.
+Resend the invitation email. **Requires admin session.** This revokes the old invitation and creates a new one with a fresh code -- the original hashed code cannot be recovered, so a clean replacement is the only option.
+
+Fails if `sendInviteEmail` is not configured.
 
 **Body:** `{ "id": "invitation-id" }`
 
@@ -124,7 +128,7 @@ Permanently delete an invitation record. **Requires admin session.** Use for GDP
 
 ### POST `/invite-only/validate`
 
-Check if an invite code is valid. **Public endpoint.** Does not reveal any PII.
+Check if an invite code is valid. **Public endpoint.** Does not return email or any PII.
 
 **Body:** `{ "code": "a1b2c3d4..." }`
 
@@ -135,7 +139,7 @@ Check if an invite code is valid. **Public endpoint.** Does not reveal any PII.
 
 ### GET `/invite-only/stats`
 
-Get aggregate invitation stats. **Requires admin session.**
+Aggregate invitation statistics. **Requires admin session.**
 
 **Response:**
 ```json
@@ -144,7 +148,7 @@ Get aggregate invitation stats. **Requires admin session.**
 
 ### GET `/invite-only/config`
 
-Check if invite-only mode is active. **Public endpoint.** Useful for frontend to conditionally show the invite code field.
+Check if invite-only mode is active. **Public endpoint.** Useful for conditionally rendering the invite code field on your registration page.
 
 **Response:**
 ```json
@@ -153,7 +157,7 @@ Check if invite-only mode is active. **Public endpoint.** Useful for frontend to
 
 ## Rate Limits
 
-Default rate limits (configurable via `rateLimits` option):
+Default rate limits (configurable via the `rateLimits` option):
 
 | Endpoint | Max | Window |
 |----------|-----|--------|

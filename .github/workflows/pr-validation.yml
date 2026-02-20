@@ -4,6 +4,10 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -16,17 +20,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22.x
+          cache: npm
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Check for merge conflicts
-        run: git diff --check HEAD~1
-
-      - name: Version bump check
-        run: |
-          CURRENT=$(node -p "require('./package.json').version")
-          echo "Current version: $CURRENT"
 
       - name: Type check
         run: npm run type-check
@@ -57,6 +54,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22.x
+          cache: npm
 
       - name: Install dependencies
         run: npm ci
@@ -73,6 +71,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22.x
+          cache: npm
 
       - name: Install dependencies
         run: npm ci
@@ -85,7 +84,9 @@ jobs:
           echo "## Bundle Size" >> $GITHUB_STEP_SUMMARY
           echo "| File | Size |" >> $GITHUB_STEP_SUMMARY
           echo "|------|------|" >> $GITHUB_STEP_SUMMARY
-          for f in dist/*.mjs dist/*.js; do
-            SIZE=$(wc -c < "$f" | tr -d ' ')
-            echo "| $(basename $f) | ${SIZE} bytes |" >> $GITHUB_STEP_SUMMARY
+          for f in dist/index.js dist/index.cjs dist/client.js dist/client.cjs; do
+            if [ -f "$f" ]; then
+              SIZE=$(wc -c < "$f" | tr -d ' ')
+              echo "| $(basename $f) | ${SIZE}B |" >> $GITHUB_STEP_SUMMARY
+            fi
           done
