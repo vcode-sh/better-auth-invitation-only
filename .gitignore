@@ -1,0 +1,14 @@
+node_modules
+dist
+.DS_Store
+.env
+info/
+.mcp.json
+.claude
+.npmrc
+.messages/
+coverage/
+.vitest/
+voice-tone.md
+TODO.md
+*.tgz

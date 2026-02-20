@@ -1,0 +1,29 @@
+{
+  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "extends": ["ultracite"],
+  "linter": {
+    "rules": {
+      "complexity": {
+        "useNumericSeparators": "off",
+        "noExcessiveCognitiveComplexity": "off"
+      },
+      "style": {
+        "useNamingConvention": "off",
+        "useFilenamingConvention": "off",
+        "noNonNullAssertion": "off",
+        "useDefaultParameterLast": "off",
+        "noMagicNumbers": "off"
+      },
+      "suspicious": {
+        "noExplicitAny": "off",
+        "noEmptyBlockStatements": "off"
+      },
+      "nursery": {
+        "useTopLevelRegex": "off"
+      },
+      "performance": {
+        "noDelete": "off"
+      }
+    }
+  }
+}
