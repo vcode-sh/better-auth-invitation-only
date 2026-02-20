@@ -1,11 +1,6 @@
 import type { BetterAuthClientPlugin } from "better-auth/client";
+import type { BetterFetchOption } from "@better-fetch/fetch";
 import type { inviteOnly } from "./index";
-import type {
-	CreateInvitationResult,
-	InvitationStats,
-	InvitationWithStatus,
-	ResendInvitationResult,
-} from "./types";
 
 type InviteOnlyPlugin = typeof inviteOnly;
 
@@ -18,15 +13,16 @@ export const inviteOnlyClient = () => {
 			/**
 			 * Create a new invitation (admin only).
 			 */
-			createInvitation: async (params: {
-				email: string;
-				sendEmail?: boolean;
-			}): Promise<CreateInvitationResult> => {
+			createInvitation: async (
+				params: { email: string; sendEmail?: boolean },
+				fetchOptions?: BetterFetchOption,
+			) => {
 				const res = await $fetch("/invite-only/create", {
 					method: "POST",
 					body: params,
+					...fetchOptions,
 				});
-				return res.data;
+				return res;
 			},
 
 			/**
@@ -38,7 +34,8 @@ export const inviteOnlyClient = () => {
 					limit?: number;
 					cursor?: string;
 				} = {},
-			): Promise<{ items: InvitationWithStatus[]; nextCursor?: string }> => {
+				fetchOptions?: BetterFetchOption,
+			) => {
 				const query = new URLSearchParams();
 				if (params.status) query.set("status", params.status);
 				if (params.limit) query.set("limit", String(params.limit));
@@ -47,30 +44,33 @@ export const inviteOnlyClient = () => {
 				const qs = query.toString();
 				const res = await $fetch(`/invite-only/list${qs ? `?${qs}` : ""}`, {
 					method: "GET",
+					...fetchOptions,
 				});
-				return res.data;
+				return res;
 			},
 
 			/**
 			 * Revoke an invitation (admin only). Soft-delete via revokedAt timestamp.
 			 */
-			revokeInvitation: async (params: { id: string }): Promise<{ success: boolean }> => {
+			revokeInvitation: async (params: { id: string }, fetchOptions?: BetterFetchOption) => {
 				const res = await $fetch("/invite-only/revoke", {
 					method: "POST",
 					body: params,
+					...fetchOptions,
 				});
-				return res.data;
+				return res;
 			},
 
 			/**
 			 * Resend invitation — revokes the old one and creates a new invitation with a fresh code.
 			 */
-			resendInvitation: async (params: { id: string }): Promise<ResendInvitationResult> => {
+			resendInvitation: async (params: { id: string }, fetchOptions?: BetterFetchOption) => {
 				const res = await $fetch("/invite-only/resend", {
 					method: "POST",
 					body: params,
+					...fetchOptions,
 				});
-				return res.data;
+				return res;
 			},
 
 			/**
@@ -78,34 +78,38 @@ export const inviteOnlyClient = () => {
 			 * Returns whether the code is valid and its associated email.
 			 */
 			validateInviteCode: async (
-				code: string,
-			): Promise<{ valid: boolean; expiresAt?: string }> => {
+				params: { code: string },
+				fetchOptions?: BetterFetchOption,
+			) => {
 				const res = await $fetch("/invite-only/validate", {
 					method: "POST",
-					body: { code },
+					body: params,
+					...fetchOptions,
 				});
-				return res.data;
+				return res;
 			},
 
 			/**
 			 * Get invitation stats (admin only).
 			 */
-			getInvitationStats: async (): Promise<InvitationStats> => {
+			getInvitationStats: async (fetchOptions?: BetterFetchOption) => {
 				const res = await $fetch("/invite-only/stats", {
 					method: "GET",
+					...fetchOptions,
 				});
-				return res.data;
+				return res;
 			},
 
 			/**
 			 * Get invite-only configuration (public endpoint).
 			 * Useful for the registration page to know if invite-only mode is active.
 			 */
-			getInviteConfig: async (): Promise<{ enabled: boolean }> => {
+			getInviteConfig: async (fetchOptions?: BetterFetchOption) => {
 				const res = await $fetch("/invite-only/config", {
 					method: "GET",
+					...fetchOptions,
 				});
-				return res.data;
+				return res;
 			},
 
 			/**

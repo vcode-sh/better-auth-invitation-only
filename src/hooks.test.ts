@@ -241,6 +241,45 @@ describe("hooks.ts", () => {
 			const ctx = { path: "/callback/google", body: {}, headers: null as any, context: { adapter: a } };
 			await expect(createBeforeHooks(OPTS)[1].handler(ctx)).rejects.toThrow(ERROR_CODES.INVITE_REQUIRED);
 		});
+
+		it("INVALID_INVITE when OAuth cookie points to expired invitation", async () => {
+			const a = mkAdapter();
+			a.findOne.mockResolvedValue(inv({ expiresAt: past() }));
+			await expect(createBeforeHooks(OPTS)[1].handler(oCtx(a, "valid-code")))
+				.rejects.toThrow(ERROR_CODES.INVALID_INVITE);
+		});
+
+		it("INVALID_INVITE when OAuth cookie points to used invitation", async () => {
+			const a = mkAdapter();
+			a.findOne.mockResolvedValue(inv({ usedAt: new Date(), usedBy: "x" }));
+			await expect(createBeforeHooks(OPTS)[1].handler(oCtx(a, "valid-code")))
+				.rejects.toThrow(ERROR_CODES.INVALID_INVITE);
+		});
+
+		it("INVALID_INVITE when OAuth cookie code not found in DB", async () => {
+			const a = mkAdapter();
+			a.findOne.mockResolvedValue(null);
+			await expect(createBeforeHooks(OPTS)[1].handler(oCtx(a, "unknown-code")))
+				.rejects.toThrow(ERROR_CODES.INVALID_INVITE);
+		});
+
+		it("TOO_MANY_REQUESTS when OAuth pending map is full with fresh entries", async () => {
+			for (let i = 0; i < PENDING_MAX_SIZE; i++)
+				__pendingInvites.set(`f${i}`, { invitationId: `i${i}`, createdAt: Date.now() });
+			const a = mkAdapter();
+			a.findOne.mockResolvedValue(inv());
+			await expect(createBeforeHooks(OPTS)[1].handler(oCtx(a, "valid-code")))
+				.rejects.toThrow("Too many pending signups");
+		});
+
+		it("OAuth cleanup frees space when map is full of expired entries", async () => {
+			for (let i = 0; i < PENDING_MAX_SIZE; i++)
+				__pendingInvites.set(`f${i}`, { invitationId: `i${i}`, createdAt: Date.now() - PENDING_TTL_MS - 1 });
+			const a = mkAdapter();
+			a.findOne.mockResolvedValue(inv());
+			await createBeforeHooks(OPTS)[1].handler(oCtx(a, "valid-code"));
+			expect(__pendingInvites.has("__code:valid-code")).toBe(true);
+		});
 	});
 
 	// --- Matchers ---

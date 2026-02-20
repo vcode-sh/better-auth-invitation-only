@@ -12,3 +12,7 @@ coverage/
 voice-tone.md
 TODO.md
 *.tgz
+PLAN.md
+better-auth-plugins.md
+better-auth-typescript.md
+better-auth-problems.md

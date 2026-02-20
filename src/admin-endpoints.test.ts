@@ -26,6 +26,7 @@ vi.mock("./utils", () => ({
 		if (inv.usedAt || inv.revokedAt) return false;
 		return new Date(inv.expiresAt) >= new Date();
 	}),
+	generateInviteCode: vi.fn((bytes: number = 16) => "a1b2c3d4".repeat(bytes / 4).slice(0, bytes * 2)),
 }));
 
 import { createAdminEndpoints } from "./admin-endpoints";
@@ -216,6 +217,38 @@ describe("listInvitations", () => {
 		await handler(ctx);
 		expect(adapter.findMany.mock.calls[0][0].limit).toBe(6);
 	});
+
+	it("filters 'pending' status with usedAt/revokedAt null and expiresAt gt now", async () => {
+		const { adapter, ctx } = makeCtx({ query: { status: "pending", limit: 50 } });
+		adapter.findMany.mockResolvedValue([inv()]);
+		await handler(ctx);
+		const where = adapter.findMany.mock.calls[0][0].where;
+		expect(where).toEqual(expect.arrayContaining([
+			expect.objectContaining({ field: "usedAt", value: null }),
+			expect.objectContaining({ field: "revokedAt", value: null }),
+			expect.objectContaining({ field: "expiresAt", operator: "gt" }),
+		]));
+	});
+
+	it("filters 'revoked' status with revokedAt ne null", async () => {
+		const { adapter, ctx } = makeCtx({ query: { status: "revoked", limit: 50 } });
+		adapter.findMany.mockResolvedValue([]);
+		await handler(ctx);
+		expect(adapter.findMany.mock.calls[0][0].where).toEqual(
+			expect.arrayContaining([expect.objectContaining({ field: "revokedAt", operator: "ne", value: null })]),
+		);
+	});
+
+	it("filters 'expired' status post-fetch via computeInvitationStatus", async () => {
+		const { adapter, ctx } = makeCtx({ query: { status: "expired", limit: 50 } });
+		adapter.findMany.mockResolvedValue([
+			inv({ id: "a", expiresAt: past }),
+			inv({ id: "b", expiresAt: future }),
+		]);
+		const result = await handler(ctx);
+		expect(result.items.every((i: any) => i.status === "expired")).toBe(true);
+		expect(result.items).toHaveLength(1);
+	});
 });
 
 describe("invitationStats", () => {
@@ -368,5 +401,44 @@ describe("resendInvitation", () => {
 		adapter.create.mockRejectedValue(new Error("DB constraint"));
 		await expect(handler(ctx)).rejects.toThrow("DB constraint");
 		expect(adapter.update).toHaveBeenCalledOnce();
+	});
+
+	it("falls back to email when user.name is null for invitedByName", async () => {
+		const send = vi.fn().mockResolvedValue(undefined);
+		const mut = createAdminMutations({ ...opts, customGenerateCode: () => "c", sendInviteEmail: send });
+		const { adapter, ctx } = makeCtx({ body: { id: "inv-1" } });
+		ctx.context.session.user.name = null;
+		adapter.findOne.mockResolvedValue(inv());
+		adapter.update.mockResolvedValue({});
+		adapter.create.mockResolvedValue({ id: "inv-new" });
+		await mut.resendInvitation(ctx);
+		expect(send.mock.calls[0][0].invitedByName).toBe("admin@test.com");
+	});
+});
+
+describe("admin-helpers integration", () => {
+	it("makeCode uses default generator when customGenerateCode not provided", async () => {
+		const ep = createAdminEndpoints({ ...opts, customGenerateCode: undefined });
+		const { adapter, ctx } = makeCtx({ body: { email: "x@t.com", sendEmail: false } });
+		adapter.create.mockResolvedValue({ id: "inv-1" });
+		const result = await ep.createInvitation(ctx);
+		expect(result.code).toMatch(/^[0-9a-f]+$/);
+	});
+
+	it("getBaseUrl falls back to ctx.context.options.baseURL when baseUrl not provided", async () => {
+		const ep = createAdminEndpoints({ ...opts, baseUrl: undefined, customGenerateCode: () => "c" });
+		const { adapter, ctx } = makeCtx({ body: { email: "x@t.com", sendEmail: false } });
+		adapter.create.mockResolvedValue({ id: "inv-1" });
+		const result = await ep.createInvitation(ctx);
+		expect(result.inviteUrl).toContain("https://app.com");
+	});
+
+	it("getBaseUrl returns empty string when no baseUrl or ctx baseURL", async () => {
+		const ep = createAdminEndpoints({ ...opts, baseUrl: undefined, customGenerateCode: () => "c" });
+		const { adapter, ctx } = makeCtx({ body: { email: "x@t.com", sendEmail: false } });
+		ctx.context.options = {};
+		adapter.create.mockResolvedValue({ id: "inv-1" });
+		const result = await ep.createInvitation(ctx);
+		expect(result.inviteUrl).toBe("/register?invite=c");
 	});
 });

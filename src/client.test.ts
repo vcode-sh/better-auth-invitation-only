@@ -47,8 +47,8 @@ describe("createInvitation", () => {
 			method: "POST",
 			body: { email: "a@b.com", sendEmail: true },
 		});
-		expect(result.code).toBe("abc");
-		expect(result.emailSent).toBe(true);
+		expect(result.data?.code).toBe("abc");
+		expect(result.data?.emailSent).toBe(true);
 	});
 
 	it("defaults sendEmail to undefined when not passed", async () => {
@@ -98,7 +98,7 @@ describe("revokeInvitation", () => {
 			method: "POST",
 			body: { id: "inv-1" },
 		});
-		expect(result.success).toBe(true);
+		expect(result.data?.success).toBe(true);
 	});
 });
 
@@ -115,8 +115,8 @@ describe("resendInvitation", () => {
 			method: "POST",
 			body: { id: "inv-2" },
 		});
-		expect(result.success).toBe(true);
-		expect(result.newInvitationId).toBe("inv-3");
+		expect(result.data?.success).toBe(true);
+		expect(result.data?.newInvitationId).toBe("inv-3");
 	});
 });
 
@@ -127,23 +127,23 @@ describe("validateInviteCode", () => {
 		});
 		const actions = inviteOnlyClient().getActions(mockFetch, {}, {});
 
-		const result = await actions.validateInviteCode("mycode");
+		const result = await actions.validateInviteCode({ code: "mycode" });
 
 		expect(mockFetch).toHaveBeenCalledWith("/invite-only/validate", {
 			method: "POST",
 			body: { code: "mycode" },
 		});
-		expect(result.valid).toBe(true);
-		expect(result.expiresAt).toBe("2026-01-01");
+		expect(result.data?.valid).toBe(true);
+		expect(result.data?.expiresAt).toBe("2026-01-01");
 	});
 
 	it("returns valid: false for invalid code", async () => {
 		const mockFetch = createMockFetch({ "/invite-only/validate": { valid: false } });
 		const actions = inviteOnlyClient().getActions(mockFetch, {}, {});
 
-		const result = await actions.validateInviteCode("bad");
-		expect(result.valid).toBe(false);
-		expect(result.expiresAt).toBeUndefined();
+		const result = await actions.validateInviteCode({ code: "bad" });
+		expect(result.data?.valid).toBe(false);
+		expect(result.data?.expiresAt).toBeUndefined();
 	});
 });
 
@@ -154,7 +154,7 @@ describe("getInvitationStats", () => {
 		const actions = inviteOnlyClient().getActions(mockFetch, {}, {});
 
 		const result = await actions.getInvitationStats();
-		expect(result).toEqual(stats);
+		expect(result.data).toEqual(stats);
 	});
 });
 
@@ -164,7 +164,7 @@ describe("getInviteConfig", () => {
 		const actions = inviteOnlyClient().getActions(mockFetch, {}, {});
 
 		const result = await actions.getInviteConfig();
-		expect(result.enabled).toBe(true);
+		expect(result.data?.enabled).toBe(true);
 	});
 });
 
