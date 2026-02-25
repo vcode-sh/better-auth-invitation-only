@@ -1,5 +1,7 @@
 /**
  * Configuration options for the invite-only registration plugin.
+ *
+ * @see https://github.com/vcode-sh/better-auth-invitation-only#configuration
  */
 export interface InviteOnlyPluginOptions {
   /**
