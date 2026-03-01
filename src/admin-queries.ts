@@ -39,9 +39,7 @@ export function createAdminQueries(opts: AdminEndpointOptions) {
           ctx.context.logger
         );
         if (!admin) {
-          throw new APIError("FORBIDDEN", {
-            message: ERROR_CODES.ADMIN_REQUIRED,
-          });
+          throw APIError.from("FORBIDDEN", ERROR_CODES.ADMIN_REQUIRED);
         }
 
         const where: any[] = [];
@@ -113,9 +111,7 @@ export function createAdminQueries(opts: AdminEndpointOptions) {
           ctx.context.logger
         );
         if (!admin) {
-          throw new APIError("FORBIDDEN", {
-            message: ERROR_CODES.ADMIN_REQUIRED,
-          });
+          throw APIError.from("FORBIDDEN", ERROR_CODES.ADMIN_REQUIRED);
         }
 
         const logger = ctx.context.logger;

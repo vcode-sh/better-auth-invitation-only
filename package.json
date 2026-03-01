@@ -1,6 +1,6 @@
 {
   "name": "better-auth-invitation-only",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "description": "Invite-only registration plugin for Better Auth. Gate signups with admin-managed invitation codes, support email + OAuth flows, with full CRUD admin endpoints.",
   "keywords": [
     "better-auth",
@@ -68,7 +68,7 @@
   },
   "sideEffects": false,
   "peerDependencies": {
-    "better-auth": "^1.4.18"
+    "better-auth": "^1.5.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.4",
@@ -76,7 +76,7 @@
     "@types/node": "^25.3.0",
     "@vitest/coverage-v8": "^4.0.18",
     "@vitest/ui": "^4.0.18",
-    "better-auth": "^1.4.18",
+    "better-auth": "^1.5.0",
     "better-sqlite3": "^12.6.2",
     "happy-dom": "^20.6.3",
     "lint-staged": "^16.2.7",

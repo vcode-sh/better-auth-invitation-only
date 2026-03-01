@@ -81,14 +81,14 @@ export const inviteOnly = (options: InviteOnlyPluginOptions = {}) => {
   return {
     id: "invite-only",
 
-    init: async (ctx: any) => {
+    init: async (ctx) => {
       if (store instanceof MemoryInviteStore) {
         store.startCleanupInterval();
         if (
           typeof process !== "undefined" &&
           process.env?.NODE_ENV === "production"
         ) {
-          ctx?.context?.logger?.warn?.(
+          (ctx as any)?.context?.logger?.warn?.(
             "invite-only: Using in-memory invite store. Not suitable for multi-process or serverless deployments. Provide a custom inviteStore option."
           );
         }
@@ -183,3 +183,11 @@ export const inviteOnly = (options: InviteOnlyPluginOptions = {}) => {
     ],
   } satisfies BetterAuthPlugin;
 };
+
+declare module "@better-auth/core" {
+  interface BetterAuthPluginRegistry<AuthOptions, Options> {
+    "invite-only": {
+      creator: typeof inviteOnly;
+    };
+  }
+}

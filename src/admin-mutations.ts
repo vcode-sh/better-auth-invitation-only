@@ -36,9 +36,7 @@ export function createAdminMutations(opts: AdminEndpointOptions) {
           ctx.context.logger
         );
         if (!admin) {
-          throw new APIError("FORBIDDEN", {
-            message: ERROR_CODES.ADMIN_REQUIRED,
-          });
+          throw APIError.from("FORBIDDEN", ERROR_CODES.ADMIN_REQUIRED);
         }
 
         const invitation = (await ctx.context.adapter.findOne({
@@ -47,17 +45,13 @@ export function createAdminMutations(opts: AdminEndpointOptions) {
         })) as Invitation | null;
 
         if (!invitation) {
-          throw new APIError("NOT_FOUND", { message: ERROR_CODES.NOT_FOUND });
+          throw APIError.from("NOT_FOUND", ERROR_CODES.NOT_FOUND);
         }
         if (invitation.usedAt) {
-          throw new APIError("BAD_REQUEST", {
-            message: ERROR_CODES.ALREADY_USED,
-          });
+          throw APIError.from("BAD_REQUEST", ERROR_CODES.ALREADY_USED);
         }
         if (invitation.revokedAt) {
-          throw new APIError("BAD_REQUEST", {
-            message: ERROR_CODES.ALREADY_REVOKED,
-          });
+          throw APIError.from("BAD_REQUEST", ERROR_CODES.ALREADY_REVOKED);
         }
 
         await ctx.context.adapter.update({
@@ -84,15 +78,11 @@ export function createAdminMutations(opts: AdminEndpointOptions) {
           ctx.context.logger
         );
         if (!admin) {
-          throw new APIError("FORBIDDEN", {
-            message: ERROR_CODES.ADMIN_REQUIRED,
-          });
+          throw APIError.from("FORBIDDEN", ERROR_CODES.ADMIN_REQUIRED);
         }
 
         if (!sendInviteEmail) {
-          throw new APIError("BAD_REQUEST", {
-            message: ERROR_CODES.EMAIL_NOT_CONFIGURED,
-          });
+          throw APIError.from("BAD_REQUEST", ERROR_CODES.EMAIL_NOT_CONFIGURED);
         }
 
         const invitation = (await ctx.context.adapter.findOne({
@@ -101,12 +91,10 @@ export function createAdminMutations(opts: AdminEndpointOptions) {
         })) as Invitation | null;
 
         if (!invitation) {
-          throw new APIError("NOT_FOUND", { message: ERROR_CODES.NOT_FOUND });
+          throw APIError.from("NOT_FOUND", ERROR_CODES.NOT_FOUND);
         }
         if (!isInvitationValid(invitation)) {
-          throw new APIError("BAD_REQUEST", {
-            message: ERROR_CODES.NO_LONGER_VALID,
-          });
+          throw APIError.from("BAD_REQUEST", ERROR_CODES.NO_LONGER_VALID);
         }
 
         // Original code is not stored (only hash). Revoke old + create new.
@@ -156,9 +144,10 @@ export function createAdminMutations(opts: AdminEndpointOptions) {
           ctx.context.logger?.error?.("Failed to resend invitation email", {
             error: err,
           });
-          throw new APIError("INTERNAL_SERVER_ERROR", {
-            message: "Failed to send email",
-          });
+          throw APIError.from(
+            "INTERNAL_SERVER_ERROR",
+            ERROR_CODES.EMAIL_SEND_FAILED
+          );
         }
 
         return ctx.json({

@@ -41,7 +41,6 @@ beforeAll(async () => {
 
   const { betterAuth } = await import("better-auth");
   const { mongodbAdapter } = await import("better-auth/adapters/mongodb");
-  const { getAdapter } = await import("better-auth/db");
 
   const auth = betterAuth({
     baseURL: "http://localhost:4000",
@@ -56,7 +55,8 @@ beforeAll(async () => {
     emailAndPassword: { enabled: true },
     secret: "test-secret-long-enough-for-validation-check",
   });
-  db = await getAdapter(auth.options);
+  const ctx = await auth.$context;
+  db = ctx.adapter;
 
   const user = await db.create({
     model: "user",

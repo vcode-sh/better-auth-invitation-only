@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented here. I keep it honest -- no "minor improvements" hand-waving.
 
+## [1.0.0] - 2026-03-01
+
+The "we're calling it stable because it actually is" release. Upgraded to Better Auth 1.5 and earned the right to drop the zero.
+
+### Breaking
+
+- **Peer dependency**: requires `better-auth >= 1.5.0` (was `>= 1.4.18`)
+- **Error codes are now objects**: `ERROR_CODES.INVITE_REQUIRED` is `{ code: "INVITE_REQUIRED", message: "Invitation code required" }` instead of a plain string. If you were importing `ERROR_CODES` for custom error handling, access `.message` or `.code` on them now. This aligns with Better Auth 1.5's `defineErrorCodes()` convention.
+
+### Changed
+
+- Migrated all error handling from `new APIError("STATUS", { message })` to `APIError.from("STATUS", errorCode)` -- Better Auth 1.5's new pattern
+- Error codes now use `defineErrorCodes()` from `@better-auth/core/utils/error-codes`
+- Plugin registers itself in `BetterAuthPluginRegistry` for proper type inference in 1.5
+- MongoDB integration tests use `auth.$context` adapter access (replaces removed `getAdapter`)
+- Added `@better-auth/core` to build externals
+
+### Added
+
+- `TOO_MANY_PENDING` error code -- surfaced when the pending invites store is full
+- `EMAIL_SEND_FAILED` error code -- returned when the resend email callback throws
+
 ## [0.3.0] - 2026-02-20
 
 The "runs everywhere, trusts nothing" release. Took every low-confidence gap -- edge runtimes, MongoDB, community adapters, OAuth in serverless -- and beat them into submission with 88 new tests and zero assumptions about your stack.

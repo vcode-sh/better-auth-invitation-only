@@ -5,7 +5,7 @@ Three steps between you and a signup page that actually gatekeeps. Revolutionary
 ## Prerequisites
 
 - Node.js >= 22
-- Better Auth >= 1.4.18
+- Better Auth >= 1.5.0
 
 That's it. No Kubernetes cluster. No "enterprise licence agreement." Just a runtime and an auth library.
 

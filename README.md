@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9+-3178c6)](https://www.typescriptlang.org/)
 
-Your app is not a nightclub, but it should have a bouncer. Invite-only registration plugin for [Better Auth](https://better-auth.com) -- because "open signups" is just another way of saying "please, bots, come ruin everything."
+Your app is not a nightclub, but it should have a bouncer. Invite-only registration plugin for [Better Auth](https://better-auth.com) v1.5+ -- because "open signups" is just another way of saying "please, bots, come ruin everything."
 
 ## Features
 
@@ -231,6 +231,19 @@ I take security seriously, which is a sentence that usually precedes a data brea
 - OAuth cookies use `Secure`, `SameSite=Lax`, and short TTL
 - All inputs validated with Zod with length limits (max 256 chars)
 - Per-endpoint rate limiting prevents brute-force attacks
+
+## Error Handling
+
+The plugin exports typed error codes if you need to handle specific failures. Each code is a `{ code, message }` object -- because Better Auth 1.5 decided strings were too simple and honestly, they were right.
+
+```typescript
+import { ERROR_CODES } from "better-auth-invitation-only";
+
+// { code: "INVITE_REQUIRED", message: "Invitation code required" }
+console.log(ERROR_CODES.INVITE_REQUIRED);
+```
+
+Full list: `INVITE_REQUIRED`, `INVALID_INVITE`, `INVITE_EXPIRED`, `INVITE_EXHAUSTED`, `EMAIL_MISMATCH`, `ADMIN_REQUIRED`, `NOT_FOUND`, `ALREADY_USED`, `ALREADY_REVOKED`, `NO_LONGER_VALID`, `DOMAIN_NOT_ALLOWED`, `BATCH_EMPTY`, `EMAIL_NOT_CONFIGURED`, `EMAIL_SEND_FAILED`, `TOO_MANY_PENDING`. See [API Reference](docs/api-reference.md) for the full table with HTTP status codes.
 
 ## Known Limitations
 

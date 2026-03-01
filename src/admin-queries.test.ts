@@ -4,13 +4,22 @@ import { ERROR_CODES } from "./constants";
 vi.mock("better-auth/api", () => ({
   createAuthEndpoint: (_path: string, _options: any, handler: any) => handler,
   sessionMiddleware: {},
-  APIError: class APIError extends Error {
-    status: string;
-    constructor(status: string, options?: { message?: string }) {
-      super(options?.message ?? status);
-      this.status = status;
+  APIError: (() => {
+    class APIError extends Error {
+      status: string;
+      constructor(status: string, options?: { message?: string }) {
+        super(options?.message ?? status);
+        this.status = status;
+      }
+      static from(
+        status: string,
+        error: { code: string; message: string }
+      ): APIError {
+        return new APIError(status, { message: error.message });
+      }
     }
-  },
+    return APIError;
+  })(),
 }));
 
 vi.mock("./utils", () => ({
@@ -147,7 +156,9 @@ describe("listInvitations", () => {
   it("throws FORBIDDEN for non-admin user", async () => {
     const { ctx } = makeCtx({ query: { status: "all", limit: 50 } });
     ctx.context.session.user.role = "user";
-    await expect(handler(ctx)).rejects.toThrow(ERROR_CODES.ADMIN_REQUIRED);
+    await expect(handler(ctx)).rejects.toThrow(
+      ERROR_CODES.ADMIN_REQUIRED.message
+    );
   });
 
   it("applies cursor filter when cursor is provided", async () => {
@@ -271,7 +282,9 @@ describe("invitationStats", () => {
   it("throws FORBIDDEN for non-admin", async () => {
     const { ctx } = makeCtx();
     ctx.context.session.user.role = "user";
-    await expect(handler(ctx)).rejects.toThrow(ERROR_CODES.ADMIN_REQUIRED);
+    await expect(handler(ctx)).rejects.toThrow(
+      ERROR_CODES.ADMIN_REQUIRED.message
+    );
   });
 
   // FIX: pending floors at 0 when DB counts overlap (used+revoked+expired > total)

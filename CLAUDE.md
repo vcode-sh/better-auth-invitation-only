@@ -31,7 +31,9 @@ Two entry points via tsup: `src/index.ts` (server plugin) and `src/client.ts` (c
 - **Config**: `biome.jsonc` extends `ultracite/core`, relaxes naming conventions and `noExplicitAny`
 - **TypeScript**: strict mode, `verbatimModuleSyntax`, `noUncheckedIndexedAccess`, ES2022 target, bundler module resolution
 - **File size**: under 250 LOC (hard limit 280)
-- **Zod**: uses Zod 4.x (via better-auth) — use `z.string().email()`, not `z.email()`
+- **Zod**: uses Zod 4.x (via better-auth 1.5) — use `z.string().email()`, not `z.email()`
+- **Error codes**: use `defineErrorCodes()` from `@better-auth/core/utils/error-codes` — produces `{ code, message }` objects, not plain strings
+- **APIError**: use `APIError.from("STATUS", ERROR_CODES.X)` — not `new APIError("STATUS", { message })`
 - **lint-staged**: runs `npx ultracite fix` on commit for `*.{ts,tsx,js,jsx,json,jsonc,css}`
 
 ## Testing
@@ -62,7 +64,7 @@ npm run lint:fix       # npx ultracite fix
 
 ## Dependencies
 
-**Peer**: `better-auth >= 1.4.18`
+**Peer**: `better-auth >= 1.5.0`
 
 **Dev only** (nothing at runtime):
 - `@biomejs/biome`, `ultracite` — linting

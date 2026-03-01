@@ -46,15 +46,11 @@ export function createAdminEndpoints(opts: AdminEndpointOptions) {
           ctx.context.logger
         );
         if (!admin) {
-          throw new APIError("FORBIDDEN", {
-            message: ERROR_CODES.ADMIN_REQUIRED,
-          });
+          throw APIError.from("FORBIDDEN", ERROR_CODES.ADMIN_REQUIRED);
         }
 
         if (!isDomainAllowed(ctx.body.email, allowedDomains)) {
-          throw new APIError("BAD_REQUEST", {
-            message: ERROR_CODES.DOMAIN_NOT_ALLOWED,
-          });
+          throw APIError.from("BAD_REQUEST", ERROR_CODES.DOMAIN_NOT_ALLOWED);
         }
 
         const code = await makeCode(customGenerateCode, codeLengthBytes);
@@ -147,17 +143,16 @@ export function createAdminEndpoints(opts: AdminEndpointOptions) {
           ctx.context.logger
         );
         if (!admin) {
-          throw new APIError("FORBIDDEN", {
-            message: ERROR_CODES.ADMIN_REQUIRED,
-          });
+          throw APIError.from("FORBIDDEN", ERROR_CODES.ADMIN_REQUIRED);
         }
 
         const results: CreateInvitationResult[] = [];
 
         for (const item of ctx.body.invitations) {
           if (!isDomainAllowed(item.email, allowedDomains)) {
-            throw new APIError("BAD_REQUEST", {
-              message: `${ERROR_CODES.DOMAIN_NOT_ALLOWED}: ${item.email}`,
+            throw APIError.from("BAD_REQUEST", {
+              ...ERROR_CODES.DOMAIN_NOT_ALLOWED,
+              message: `${ERROR_CODES.DOMAIN_NOT_ALLOWED.message}: ${item.email}`,
             });
           }
 
@@ -239,9 +234,7 @@ export function createAdminEndpoints(opts: AdminEndpointOptions) {
           ctx.context.logger
         );
         if (!admin) {
-          throw new APIError("FORBIDDEN", {
-            message: ERROR_CODES.ADMIN_REQUIRED,
-          });
+          throw APIError.from("FORBIDDEN", ERROR_CODES.ADMIN_REQUIRED);
         }
 
         const invitation = (await ctx.context.adapter.findOne({
@@ -250,7 +243,7 @@ export function createAdminEndpoints(opts: AdminEndpointOptions) {
         })) as Invitation | null;
 
         if (!invitation) {
-          throw new APIError("NOT_FOUND", { message: ERROR_CODES.NOT_FOUND });
+          throw APIError.from("NOT_FOUND", ERROR_CODES.NOT_FOUND);
         }
 
         await ctx.context.adapter.delete({

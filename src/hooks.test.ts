@@ -143,7 +143,7 @@ describe("hooks.ts", () => {
       const a = mkAdapter();
       const h = createBeforeHooks(OPTS);
       await expect(h[0].handler(eCtx(a, { email: "a@b.com" }))).rejects.toThrow(
-        ERROR_CODES.INVITE_REQUIRED
+        ERROR_CODES.INVITE_REQUIRED.message
       );
     });
 
@@ -154,7 +154,7 @@ describe("hooks.ts", () => {
         createBeforeHooks(OPTS)[0].handler(
           eCtx(a, { email: "a@b.com", inviteCode: "bad" })
         )
-      ).rejects.toThrow(ERROR_CODES.INVALID_INVITE);
+      ).rejects.toThrow(ERROR_CODES.INVALID_INVITE.message);
     });
 
     it("INVALID_INVITE for expired invitation", async () => {
@@ -164,7 +164,7 @@ describe("hooks.ts", () => {
         createBeforeHooks(OPTS)[0].handler(
           eCtx(a, { email: "a@b.com", inviteCode: "valid-code" })
         )
-      ).rejects.toThrow(ERROR_CODES.INVALID_INVITE);
+      ).rejects.toThrow(ERROR_CODES.INVALID_INVITE.message);
     });
 
     it("INVALID_INVITE for used invitation", async () => {
@@ -174,7 +174,7 @@ describe("hooks.ts", () => {
         createBeforeHooks(OPTS)[0].handler(
           eCtx(a, { email: "a@b.com", inviteCode: "valid-code" })
         )
-      ).rejects.toThrow(ERROR_CODES.INVALID_INVITE);
+      ).rejects.toThrow(ERROR_CODES.INVALID_INVITE.message);
     });
 
     it("INVALID_INVITE for revoked invitation", async () => {
@@ -184,7 +184,7 @@ describe("hooks.ts", () => {
         createBeforeHooks(OPTS)[0].handler(
           eCtx(a, { email: "a@b.com", inviteCode: "valid-code" })
         )
-      ).rejects.toThrow(ERROR_CODES.INVALID_INVITE);
+      ).rejects.toThrow(ERROR_CODES.INVALID_INVITE.message);
     });
 
     it("stores pending entry keyed by lowercased email", async () => {
@@ -203,7 +203,7 @@ describe("hooks.ts", () => {
         createBeforeHooks(OPTS)[0].handler(
           eCtx(a, { email: "mallory@evil.com", inviteCode: "valid-code" })
         )
-      ).rejects.toThrow(ERROR_CODES.EMAIL_MISMATCH);
+      ).rejects.toThrow(ERROR_CODES.EMAIL_MISMATCH.message);
     });
 
     it("allows any email when invitation.email is empty (no binding)", async () => {
@@ -238,7 +238,7 @@ describe("hooks.ts", () => {
         createBeforeHooks({ ...OPTS, enabled: undefined })[0].handler(
           eCtx(a, { email: "a@b.com" })
         )
-      ).rejects.toThrow(ERROR_CODES.INVITE_REQUIRED);
+      ).rejects.toThrow(ERROR_CODES.INVITE_REQUIRED.message);
     });
 
     it("SEC-2: cleanup triggered at PENDING_MAX_SIZE", async () => {
@@ -284,7 +284,7 @@ describe("hooks.ts", () => {
       const a = mkAdapter();
       await expect(
         createBeforeHooks(OPTS)[0].handler(eCtx(a, null))
-      ).rejects.toThrow(ERROR_CODES.INVITE_REQUIRED);
+      ).rejects.toThrow(ERROR_CODES.INVITE_REQUIRED.message);
     });
 
     it("email with only whitespace is treated as falsy (no pending set)", async () => {
@@ -317,7 +317,7 @@ describe("hooks.ts", () => {
     it("INVITE_REQUIRED when no cookie", async () => {
       const a = mkAdapter();
       await expect(createBeforeHooks(OPTS)[1].handler(oCtx(a))).rejects.toThrow(
-        ERROR_CODES.INVITE_REQUIRED
+        ERROR_CODES.INVITE_REQUIRED.message
       );
     });
 
@@ -364,7 +364,7 @@ describe("hooks.ts", () => {
         context: { adapter: a },
       };
       await expect(createBeforeHooks(OPTS)[1].handler(ctx)).rejects.toThrow(
-        ERROR_CODES.INVITE_REQUIRED
+        ERROR_CODES.INVITE_REQUIRED.message
       );
     });
 
@@ -373,7 +373,7 @@ describe("hooks.ts", () => {
       a.findOne.mockResolvedValue(inv({ expiresAt: past() }));
       await expect(
         createBeforeHooks(OPTS)[1].handler(oCtx(a, "valid-code"))
-      ).rejects.toThrow(ERROR_CODES.INVALID_INVITE);
+      ).rejects.toThrow(ERROR_CODES.INVALID_INVITE.message);
     });
 
     it("INVALID_INVITE when OAuth cookie points to used invitation", async () => {
@@ -381,7 +381,7 @@ describe("hooks.ts", () => {
       a.findOne.mockResolvedValue(inv({ usedAt: new Date(), usedBy: "x" }));
       await expect(
         createBeforeHooks(OPTS)[1].handler(oCtx(a, "valid-code"))
-      ).rejects.toThrow(ERROR_CODES.INVALID_INVITE);
+      ).rejects.toThrow(ERROR_CODES.INVALID_INVITE.message);
     });
 
     it("INVALID_INVITE when OAuth cookie code not found in DB", async () => {
@@ -389,7 +389,7 @@ describe("hooks.ts", () => {
       a.findOne.mockResolvedValue(null);
       await expect(
         createBeforeHooks(OPTS)[1].handler(oCtx(a, "unknown-code"))
-      ).rejects.toThrow(ERROR_CODES.INVALID_INVITE);
+      ).rejects.toThrow(ERROR_CODES.INVALID_INVITE.message);
     });
 
     it("TOO_MANY_REQUESTS when OAuth pending map is full with fresh entries", async () => {
@@ -713,7 +713,7 @@ describe("hooks.ts", () => {
         })[0].handler(
           eCtx(a, { email: "user@blocked.com", inviteCode: "valid-code" })
         )
-      ).rejects.toThrow(ERROR_CODES.DOMAIN_NOT_ALLOWED);
+      ).rejects.toThrow(ERROR_CODES.DOMAIN_NOT_ALLOWED.message);
     });
 
     it("passes when email domain is in allowedDomains", async () => {
@@ -769,7 +769,7 @@ describe("hooks.ts", () => {
         enabled: async () => ++n <= 1,
       });
       await expect(h[0].handler(eCtx(a, { email: "a@b.com" }))).rejects.toThrow(
-        ERROR_CODES.INVITE_REQUIRED
+        ERROR_CODES.INVITE_REQUIRED.message
       );
       await expect(
         h[0].handler(eCtx(a, { email: "b@b.com" }))

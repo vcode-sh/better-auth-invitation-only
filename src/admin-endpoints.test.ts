@@ -4,13 +4,22 @@ import { ERROR_CODES } from "./constants";
 vi.mock("better-auth/api", () => ({
   createAuthEndpoint: (_path: string, _options: any, handler: any) => handler,
   sessionMiddleware: {},
-  APIError: class APIError extends Error {
-    status: string;
-    constructor(status: string, options?: { message?: string }) {
-      super(options?.message ?? status);
-      this.status = status;
+  APIError: (() => {
+    class APIError extends Error {
+      status: string;
+      constructor(status: string, options?: { message?: string }) {
+        super(options?.message ?? status);
+        this.status = status;
+      }
+      static from(
+        status: string,
+        error: { code: string; message: string }
+      ): APIError {
+        return new APIError(status, { message: error.message });
+      }
     }
-  },
+    return APIError;
+  })(),
 }));
 
 vi.mock("./utils", () => ({
@@ -137,13 +146,17 @@ describe("createInvitation", () => {
   it("throws FORBIDDEN when user is not admin", async () => {
     const { ctx } = makeCtx({ body: { email: "x@t.com", sendEmail: false } });
     ctx.context.session.user.role = "user";
-    await expect(handler(ctx)).rejects.toThrow(ERROR_CODES.ADMIN_REQUIRED);
+    await expect(handler(ctx)).rejects.toThrow(
+      ERROR_CODES.ADMIN_REQUIRED.message
+    );
   });
 
   it("throws FORBIDDEN when user.role is undefined (no customIsAdmin)", async () => {
     const { ctx } = makeCtx({ body: { email: "x@t.com", sendEmail: false } });
     ctx.context.session.user.role = undefined;
-    await expect(handler(ctx)).rejects.toThrow(ERROR_CODES.ADMIN_REQUIRED);
+    await expect(handler(ctx)).rejects.toThrow(
+      ERROR_CODES.ADMIN_REQUIRED.message
+    );
   });
 
   it("sends email when sendEmail=true and sendInviteEmail configured", async () => {
@@ -271,7 +284,7 @@ describe("createInvitation", () => {
       body: { email: "user@blocked.com", sendEmail: false },
     });
     await expect(ep.createInvitation(ctx)).rejects.toThrow(
-      ERROR_CODES.DOMAIN_NOT_ALLOWED
+      ERROR_CODES.DOMAIN_NOT_ALLOWED.message
     );
   });
 
@@ -310,25 +323,31 @@ describe("revokeInvitation", () => {
   it("throws NOT_FOUND for missing invitation", async () => {
     const { adapter, ctx } = makeCtx({ body: { id: "nope" } });
     adapter.findOne.mockResolvedValue(null);
-    await expect(handler(ctx)).rejects.toThrow(ERROR_CODES.NOT_FOUND);
+    await expect(handler(ctx)).rejects.toThrow(ERROR_CODES.NOT_FOUND.message);
   });
 
   it("throws ALREADY_USED for used invitation", async () => {
     const { adapter, ctx } = makeCtx({ body: { id: "inv-1" } });
     adapter.findOne.mockResolvedValue(inv({ usedAt: new Date() }));
-    await expect(handler(ctx)).rejects.toThrow(ERROR_CODES.ALREADY_USED);
+    await expect(handler(ctx)).rejects.toThrow(
+      ERROR_CODES.ALREADY_USED.message
+    );
   });
 
   it("throws ALREADY_REVOKED for revoked invitation", async () => {
     const { adapter, ctx } = makeCtx({ body: { id: "inv-1" } });
     adapter.findOne.mockResolvedValue(inv({ revokedAt: new Date() }));
-    await expect(handler(ctx)).rejects.toThrow(ERROR_CODES.ALREADY_REVOKED);
+    await expect(handler(ctx)).rejects.toThrow(
+      ERROR_CODES.ALREADY_REVOKED.message
+    );
   });
 
   it("throws FORBIDDEN for non-admin", async () => {
     const { ctx } = makeCtx({ body: { id: "inv-1" } });
     ctx.context.session.user.role = "user";
-    await expect(handler(ctx)).rejects.toThrow(ERROR_CODES.ADMIN_REQUIRED);
+    await expect(handler(ctx)).rejects.toThrow(
+      ERROR_CODES.ADMIN_REQUIRED.message
+    );
   });
 
   // BUG: allows revoking expired invitations (no expiry check)
@@ -367,26 +386,30 @@ describe("resendInvitation", () => {
   it("throws NOT_FOUND for missing invitation", async () => {
     const { adapter, ctx } = makeCtx({ body: { id: "nope" } });
     adapter.findOne.mockResolvedValue(null);
-    await expect(handler(ctx)).rejects.toThrow(ERROR_CODES.NOT_FOUND);
+    await expect(handler(ctx)).rejects.toThrow(ERROR_CODES.NOT_FOUND.message);
   });
 
   it("throws NO_LONGER_VALID for used invitation", async () => {
     const { adapter, ctx } = makeCtx({ body: { id: "inv-1" } });
     adapter.findOne.mockResolvedValue(inv({ usedAt: new Date() }));
-    await expect(handler(ctx)).rejects.toThrow(ERROR_CODES.NO_LONGER_VALID);
+    await expect(handler(ctx)).rejects.toThrow(
+      ERROR_CODES.NO_LONGER_VALID.message
+    );
   });
 
   it("throws NO_LONGER_VALID for expired invitation", async () => {
     const { adapter, ctx } = makeCtx({ body: { id: "inv-1" } });
     adapter.findOne.mockResolvedValue(inv({ expiresAt: past }));
-    await expect(handler(ctx)).rejects.toThrow(ERROR_CODES.NO_LONGER_VALID);
+    await expect(handler(ctx)).rejects.toThrow(
+      ERROR_CODES.NO_LONGER_VALID.message
+    );
   });
 
   it("throws EMAIL_NOT_CONFIGURED when sendInviteEmail missing", async () => {
     const mut = createAdminMutations({ ...opts, sendInviteEmail: undefined });
     const { ctx } = makeCtx({ body: { id: "inv-1" } });
     await expect(mut.resendInvitation(ctx)).rejects.toThrow(
-      ERROR_CODES.EMAIL_NOT_CONFIGURED
+      ERROR_CODES.EMAIL_NOT_CONFIGURED.message
     );
   });
 
@@ -409,7 +432,9 @@ describe("resendInvitation", () => {
   it("throws FORBIDDEN for non-admin", async () => {
     const { ctx } = makeCtx({ body: { id: "inv-1" } });
     ctx.context.session.user.role = "user";
-    await expect(handler(ctx)).rejects.toThrow(ERROR_CODES.ADMIN_REQUIRED);
+    await expect(handler(ctx)).rejects.toThrow(
+      ERROR_CODES.ADMIN_REQUIRED.message
+    );
   });
 
   // BUG: no rollback - old invitation stays revoked if create fails
@@ -497,7 +522,9 @@ describe("createBatchInvitations", () => {
       body: { invitations: [{ email: "a@t.com", sendEmail: false }] },
     });
     ctx.context.session.user.role = "user";
-    await expect(handler(ctx)).rejects.toThrow(ERROR_CODES.ADMIN_REQUIRED);
+    await expect(handler(ctx)).rejects.toThrow(
+      ERROR_CODES.ADMIN_REQUIRED.message
+    );
   });
 
   it("domain whitelist rejection on any invalid email aborts the whole batch", async () => {
@@ -516,7 +543,7 @@ describe("createBatchInvitations", () => {
     });
     adapter.create.mockResolvedValue({ id: "inv-ok" });
     await expect(ep.createBatchInvitations(ctx)).rejects.toThrow(
-      ERROR_CODES.DOMAIN_NOT_ALLOWED
+      ERROR_CODES.DOMAIN_NOT_ALLOWED.message
     );
   });
 
@@ -598,13 +625,15 @@ describe("deleteInvitation", () => {
   it("throws NOT_FOUND for missing invitation", async () => {
     const { adapter, ctx } = makeCtx({ body: { id: "nope" } });
     adapter.findOne.mockResolvedValue(null);
-    await expect(handler(ctx)).rejects.toThrow(ERROR_CODES.NOT_FOUND);
+    await expect(handler(ctx)).rejects.toThrow(ERROR_CODES.NOT_FOUND.message);
   });
 
   it("throws FORBIDDEN for non-admin", async () => {
     const { ctx } = makeCtx({ body: { id: "inv-1" } });
     ctx.context.session.user.role = "user";
-    await expect(handler(ctx)).rejects.toThrow(ERROR_CODES.ADMIN_REQUIRED);
+    await expect(handler(ctx)).rejects.toThrow(
+      ERROR_CODES.ADMIN_REQUIRED.message
+    );
   });
 });
 

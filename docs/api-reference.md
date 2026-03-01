@@ -155,6 +155,46 @@ Check if invite-only mode is active. **Public endpoint.** Useful for conditional
 { "enabled": true }
 ```
 
+## Error Codes
+
+Every error the plugin throws is a named, typed error code. Import them if you need to handle specific failures -- or don't, and let the message strings do the talking.
+
+```typescript
+import { ERROR_CODES } from "better-auth-invitation-only";
+
+// Each code is { code: string, message: string }
+ERROR_CODES.INVITE_REQUIRED.code;    // "INVITE_REQUIRED"
+ERROR_CODES.INVITE_REQUIRED.message; // "Invitation code required"
+```
+
+| Code | HTTP Status | Message |
+|------|-------------|---------|
+| `INVITE_REQUIRED` | 403 | Invitation code required |
+| `INVALID_INVITE` | 403 | Invalid or expired invitation code |
+| `INVITE_EXPIRED` | 403 | Invitation code expired |
+| `INVITE_EXHAUSTED` | 403 | Invitation has reached maximum uses |
+| `EMAIL_MISMATCH` | 403 | This invitation code is for a different email address |
+| `ADMIN_REQUIRED` | 403 | Admin access required |
+| `NOT_FOUND` | 404 | Invitation not found |
+| `ALREADY_USED` | 400 | Cannot revoke a used invitation |
+| `ALREADY_REVOKED` | 400 | Invitation already revoked |
+| `NO_LONGER_VALID` | 400 | Invitation is no longer valid |
+| `DOMAIN_NOT_ALLOWED` | 400 | Email domain is not allowed |
+| `BATCH_EMPTY` | 400 | At least one invitation is required |
+| `EMAIL_NOT_CONFIGURED` | 400 | Email sending not configured |
+| `EMAIL_SEND_FAILED` | 500 | Failed to send email |
+| `TOO_MANY_PENDING` | 429 | Too many pending signups |
+
+Error responses follow the Better Auth convention:
+
+```json
+{
+  "code": "INVITE_REQUIRED",
+  "message": "Invitation code required",
+  "status": 403
+}
+```
+
 ## Rate Limits
 
 Default rate limits (configurable via the `rateLimits` option):

@@ -71,9 +71,7 @@ export function createBeforeHooks(options: {
         | string
         | undefined;
       if (!inviteCode) {
-        throw new APIError("FORBIDDEN", {
-          message: ERROR_CODES.INVITE_REQUIRED,
-        });
+        throw APIError.from("FORBIDDEN", ERROR_CODES.INVITE_REQUIRED);
       }
 
       const codeHash = hashInviteCode(inviteCode);
@@ -82,9 +80,7 @@ export function createBeforeHooks(options: {
         codeHash
       );
       if (!(invitation && isInvitationValid(invitation))) {
-        throw new APIError("FORBIDDEN", {
-          message: ERROR_CODES.INVALID_INVITE,
-        });
+        throw APIError.from("FORBIDDEN", ERROR_CODES.INVALID_INVITE);
       }
 
       const signupEmail = (body.email as string)?.toLowerCase().trim();
@@ -93,18 +89,14 @@ export function createBeforeHooks(options: {
         invitation.email &&
         invitation.email.toLowerCase() !== signupEmail
       ) {
-        throw new APIError("FORBIDDEN", {
-          message: ERROR_CODES.EMAIL_MISMATCH,
-        });
+        throw APIError.from("FORBIDDEN", ERROR_CODES.EMAIL_MISMATCH);
       }
 
       if (
         signupEmail &&
         !isDomainAllowed(signupEmail, options.allowedDomains)
       ) {
-        throw new APIError("FORBIDDEN", {
-          message: ERROR_CODES.DOMAIN_NOT_ALLOWED,
-        });
+        throw APIError.from("FORBIDDEN", ERROR_CODES.DOMAIN_NOT_ALLOWED);
       }
 
       if (store instanceof MemoryInviteStore) {
@@ -136,9 +128,7 @@ export function createBeforeHooks(options: {
           options.cookieName
         );
         if (!inviteCode) {
-          throw new APIError("FORBIDDEN", {
-            message: ERROR_CODES.INVITE_REQUIRED,
-          });
+          throw APIError.from("FORBIDDEN", ERROR_CODES.INVITE_REQUIRED);
         }
 
         const codeHash = hashInviteCode(inviteCode);
@@ -147,9 +137,7 @@ export function createBeforeHooks(options: {
           codeHash
         );
         if (!(invitation && isInvitationValid(invitation))) {
-          throw new APIError("FORBIDDEN", {
-            message: ERROR_CODES.INVALID_INVITE,
-          });
+          throw APIError.from("FORBIDDEN", ERROR_CODES.INVALID_INVITE);
         }
 
         if (store instanceof MemoryInviteStore) {

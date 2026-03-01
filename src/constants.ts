@@ -22,7 +22,9 @@ export const MAX_INPUT_LENGTH = 256;
 /** Maximum number of invitations per batch create call. */
 export const MAX_BATCH_SIZE = 50;
 
-export const ERROR_CODES = {
+import { defineErrorCodes } from "@better-auth/core/utils/error-codes";
+
+export const ERROR_CODES = defineErrorCodes({
   INVITE_REQUIRED: "Invitation code required",
   INVALID_INVITE: "Invalid or expired invitation code",
   INVITE_EXPIRED: "Invitation code expired",
@@ -36,4 +38,6 @@ export const ERROR_CODES = {
   DOMAIN_NOT_ALLOWED: "Email domain is not allowed",
   INVITE_EXHAUSTED: "Invitation has reached maximum uses",
   BATCH_EMPTY: "At least one invitation is required",
-} as const;
+  TOO_MANY_PENDING: "Too many pending signups. Please try again later.",
+  EMAIL_SEND_FAILED: "Failed to send email",
+});

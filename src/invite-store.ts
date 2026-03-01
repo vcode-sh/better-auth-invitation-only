@@ -1,5 +1,5 @@
 import { APIError } from "better-auth/api";
-import { PENDING_MAX_SIZE, PENDING_TTL_MS } from "./constants";
+import { ERROR_CODES, PENDING_MAX_SIZE, PENDING_TTL_MS } from "./constants";
 import type { InviteStore, InviteStoreEntry } from "./types";
 
 /**
@@ -51,9 +51,7 @@ export class MemoryInviteStore implements InviteStore {
     if (this.map.size >= PENDING_MAX_SIZE) {
       this.cleanup();
       if (this.map.size >= PENDING_MAX_SIZE) {
-        throw new APIError("TOO_MANY_REQUESTS", {
-          message: "Too many pending signups. Please try again later.",
-        });
+        throw APIError.from("TOO_MANY_REQUESTS", ERROR_CODES.TOO_MANY_PENDING);
       }
     }
   }
